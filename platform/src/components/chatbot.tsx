@@ -235,46 +235,87 @@ export default function Chatbot({ user: propUser }: ChatbotProps) {
     setIsLoading(true);
 
     try {
-      // Call the router agent API endpoint
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      console.log('Making request to:', `${apiUrl}/chat`);
+      // Import API client dynamically to avoid SSR issues
+      const { apiClient, checkBackendHealth, handleApiError } = await import('@/lib/api');
       
-      const response = await fetch(`${apiUrl}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Check if backend is available
+      const backendAvailable = await checkBackendHealth();
+      
+      if (backendAvailable) {
+        // Use backend API
+        console.log('Using backend API for chat');
+        
+        const response = await apiClient.sendMessage({
           message: userMessage.content,
-          username: username
-        }),
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-      
-      const data = await response.json();
-      console.log('Response data:', data);
-      
-      if (response.ok) {
-        // Handle both JSON object with response field and plain string response
-        const botResponse = typeof data === 'string' ? data : (data.response || data.message || JSON.stringify(data));
+          agent_mode: isDeepResearch ? 'deep' : 'quick',
+          user_id: username, // Using username as user_id for now
+          context: {
+            dataSources: dataSources.filter(ds => ds.enabled).map(ds => ds.id),
+            sessionId: sessionId,
+          }
+        });
         
         const botMessage: Message = {
+          id: response.message.id,
+          content: response.message.content,
+          sender: "bot",
+          timestamp: new Date(response.message.timestamp),
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
+        
+        // If deep research job was created, track it
+        if (response.research_job_id) {
+          console.log('Deep research job created:', response.research_job_id);
+          // TODO: Add research job tracking
+        }
+        
+      } else {
+        // Fallback to mock response when backend is not available
+        console.log('Backend not available, using mock response');
+        
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+        
+        const mockResponse = `I understand you're asking about: "${userMessage.content}". 
+
+${isDeepResearch ? 
+  `🔬 **Deep Research Mode Active**
+  
+  I'm conducting a comprehensive analysis of your query. This includes:
+  - Analyzing data from ${dataSources.filter(ds => ds.enabled).map(ds => ds.name).join(', ')}
+  - Cross-referencing multiple data sources
+  - Generating detailed insights and recommendations
+  
+  *Note: Backend API is not available. This is a mock response for demonstration.*` :
+  `⚡ **Quick Response**
+  
+  Based on your query, here are some initial insights:
+  - This appears to be related to data analysis
+  - I would typically access ${dataSources.filter(ds => ds.enabled).map(ds => ds.name).join(', ')} for this type of question
+  - For more detailed analysis, consider switching to Deep Research mode
+  
+  *Note: Backend API is not available. This is a mock response for demonstration.*`
+}
+
+Would you like me to elaborate on any specific aspect of this analysis?`;
+
+        const botMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: botResponse,
+          content: mockResponse,
           sender: "bot",
           timestamp: new Date(),
         };
+        
         setMessages(prev => [...prev, botMessage]);
-      } else {
-        throw new Error(data.detail || data.message || `HTTP ${response.status}: ${response.statusText}`);
       }
+      
     } catch (error) {
       console.error("Error sending message:", error);
+      const { handleApiError } = await import('@/lib/api');
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `Sorry, I'm having trouble connecting to the router agent. Error: ${error instanceof Error ? error.message : 'Unknown error'}. Please make sure the API server is running on port 8000.`,
+        content: `Sorry, I encountered an error while processing your message: ${handleApiError(error)}. Please try again.`,
         sender: "bot",
         timestamp: new Date(),
       };

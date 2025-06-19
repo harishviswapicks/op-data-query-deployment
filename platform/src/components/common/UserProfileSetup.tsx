@@ -128,7 +128,7 @@ export default function UserProfileSetup({ email, onComplete }: UserProfileSetup
               Welcome to AI Data Platform
             </CardTitle>
             <p className="text-muted-foreground text-callout">
-              Let's personalize your AI assistant experience
+              Let's personalize your AI Agent experience
             </p>
           </CardHeader>
 
@@ -241,7 +241,7 @@ export default function UserProfileSetup({ email, onComplete }: UserProfileSetup
                     Agent Preferences
                   </h3>
                   <p className="text-muted-foreground text-callout">
-                    Customize how your AI assistant responds
+                    Customize how your AI Agent responds
                   </p>
                 </div>
 

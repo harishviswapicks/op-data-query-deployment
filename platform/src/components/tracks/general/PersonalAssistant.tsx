@@ -93,7 +93,7 @@ export default function PersonalAssistant({
                 Personal Assistant Settings
               </CardTitle>
               <p className="text-caption-1 text-muted-foreground mt-1">
-                Customize your AI assistant's personality and behavior
+                Customize your AI Agent's personality and behavior
               </p>
             </div>
             {hasChanges && (

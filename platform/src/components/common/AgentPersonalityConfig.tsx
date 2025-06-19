@@ -112,10 +112,10 @@ export default function AgentPersonalityConfig({
                 </div>
                 <div>
                   <CardTitle className="text-title-2 text-foreground">
-                    AI Assistant Configuration
+                    AI Agent Configuration
                   </CardTitle>
                   <p className="text-footnote text-muted-foreground mt-1">
-                    Customize your AI assistant's personality and behavior
+                    Customize your AI Agent's personality and behavior
                   </p>
                 </div>
               </div>
@@ -140,7 +140,7 @@ export default function AgentPersonalityConfig({
                 </h3>
               </div>
               <p className="text-footnote text-muted-foreground">
-                Choose how your AI assistant communicates with you
+                Choose how your AI Agent communicates with you
               </p>
               
               <div className="grid grid-cols-2 gap-3">
@@ -283,7 +283,7 @@ export default function AgentPersonalityConfig({
                 </h3>
               </div>
               <p className="text-footnote text-muted-foreground">
-                Additional guidance for your AI assistant (optional)
+                Additional guidance for your AI Agent (optional)
               </p>
               
               <textarea

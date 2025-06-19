@@ -201,7 +201,7 @@ export default function TrackRouter() {
                   onClick={() => setShowAgentConfig(true)}
                   variant="ghost"
                   size="icon"
-                  title="Configure AI Assistant"
+                  title="Configure AI Agents"
                 >
                   <Settings className="w-4 h-4" />
                 </Button>

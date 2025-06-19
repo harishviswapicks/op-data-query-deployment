@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { User, MessageCircle, Database, Bot, Calendar, BarChart3, Activity, CheckCircle, ArrowLeft, Settings, X } from "lucide-react";
 import Image from "next/image";
 import Chatbot from "./chatbot";
+import { BackendStatus } from "./common/BackendStatus";
 
 interface User {
   username: string;
@@ -282,6 +283,7 @@ export default function Platform() {
             
             {/* User Section */}
             <div className="flex items-center gap-3">
+              <BackendStatus />
               <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-lg">
                 <User className="w-3.5 h-3.5 text-muted-foreground" />
                 <span className="text-footnote font-medium text-foreground">{user.username}</span>
