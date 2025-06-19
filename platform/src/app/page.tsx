@@ -1,5 +1,13 @@
-import Platform from "@/components/platform";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import AuthGuard from "@/components/auth/AuthGuard";
+import TrackRouter from "@/components/TrackRouter";
 
 export default function Home() {
-  return <Platform />;
+  return (
+    <AuthProvider>
+      <AuthGuard>
+        <TrackRouter />
+      </AuthGuard>
+    </AuthProvider>
+  );
 }

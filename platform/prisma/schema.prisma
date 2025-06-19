@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  role      String   // 'analyst' | 'general_employee'
+  createdAt DateTime @default(now())
+  lastActive DateTime @default(now())
+  
+  // Relations
+  preferences UserPreferences?
+  agentConfig AgentConfiguration?
+  sessions    Session[]
+  
+  @@map("users")
+}
+
+model UserPreferences {
+  id                  String @id @default(cuid())
+  userId              String @unique
+  defaultAgentMode    String // 'quick' | 'deep'
+  autoUpgradeToDeep   Boolean @default(false)
+  notificationChannels String // JSON array as string
+  workingHoursStart   String @default("09:00")
+  workingHoursEnd     String @default("17:00")
+  workingHoursTimezone String @default("America/New_York")
+  favoriteDataSources String // JSON array as string
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_preferences")
+}
+
+model AgentConfiguration {
+  id               String @id @default(cuid())
+  userId           String @unique
+  personality      String @default("professional") // 'professional' | 'friendly' | 'concise' | 'detailed'
+  responseStyle    String @default("balanced") // 'quick' | 'thorough' | 'balanced'
+  creativityLevel  Int    @default(50) // 0-100
+  responseLength   String @default("standard") // 'brief' | 'standard' | 'comprehensive'
+  customInstructions String?
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("agent_configurations")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
