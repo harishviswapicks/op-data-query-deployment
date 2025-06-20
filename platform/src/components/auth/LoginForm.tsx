@@ -4,22 +4,32 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, LogIn } from "lucide-react";
+import { Mail, LogIn, Lock, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 
 interface LoginFormProps {
   onLogin: (email: string) => void;
   onRegister: (email: string) => void;
+  onPasswordSetup: (email: string) => void;
 }
 
-export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
+export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: LoginFormProps) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [requiresPassword, setRequiresPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
+
+    // If password is required but not provided, show error
+    if (requiresPassword && !password.trim()) {
+      setError('Password is required');
+      return;
+    }
 
     setIsLoading(true);
     setError("");
@@ -32,20 +42,33 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
     }
 
     try {
-      // Try to login first
+      // Prepare login request
+      const loginData: any = { email: email.trim() };
+      if (requiresPassword && password) {
+        loginData.password = password;
+      }
+
       const loginResponse = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify(loginData),
       });
+
+      const data = await loginResponse.json();
 
       if (loginResponse.ok) {
         onLogin(email.trim());
       } else if (loginResponse.status === 404) {
         // User doesn't exist, redirect to registration
         onRegister(email.trim());
+      } else if (loginResponse.status === 428 && data.needsPasswordSetup) {
+        // User exists but needs password setup
+        onPasswordSetup(email.trim());
+      } else if (loginResponse.status === 400 && data.requiresPassword) {
+        // User has password set, require password input
+        setRequiresPassword(true);
+        setError('Please enter your password');
       } else {
-        const data = await loginResponse.json();
         setError(data.error || 'Login failed');
       }
     } catch (error) {
@@ -95,6 +118,37 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
                 />
               </div>
             </div>
+
+            {requiresPassword && (
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-footnote font-medium text-foreground">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10 pr-10"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {error && (
               <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20">

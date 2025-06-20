@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { UserProfile } from "@/types";
 import LoginForm from "./LoginForm";
+import PasswordSetupForm from "./PasswordSetupForm";
 import UserProfileSetup from "../common/UserProfileSetup";
 
 interface AuthGuardProps {
@@ -13,6 +14,7 @@ interface AuthGuardProps {
 export default function AuthGuard({ children }: AuthGuardProps) {
   const { user, isLoading } = useAuth();
   const [showSetup, setShowSetup] = useState(false);
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   const [setupEmail, setSetupEmail] = useState("");
 
   const handleLogin = async (email: string) => {
@@ -25,7 +27,32 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     setShowSetup(true);
   };
 
+  const handlePasswordSetup = (email: string) => {
+    setSetupEmail(email);
+    setShowPasswordSetup(true);
+  };
+
+  const handlePasswordSetupComplete = async () => {
+    // Password was set successfully, refresh user data
+    setShowPasswordSetup(false);
+    window.location.reload();
+  };
+
+  const handleBackToLogin = () => {
+    setShowPasswordSetup(false);
+    setShowSetup(false);
+    setSetupEmail("");
+  };
+
   const handleSetupComplete = async (profile: UserProfile) => {
+    // Check if this is a pending registration that needs password setup
+    if ((profile as any).needsPasswordSetup) {
+      setShowSetup(false);
+      setSetupEmail(profile.email); // Make sure email is set for password setup
+      setShowPasswordSetup(true);
+      return;
+    }
+    
     setShowSetup(false);
     // Refresh the auth context to get the new user
     window.location.reload();
@@ -39,6 +66,16 @@ export default function AuthGuard({ children }: AuthGuardProps) {
           <span className="text-muted-foreground">Loading...</span>
         </div>
       </div>
+    );
+  }
+
+  if (showPasswordSetup) {
+    return (
+      <PasswordSetupForm
+        email={setupEmail}
+        onPasswordSet={handlePasswordSetupComplete}
+        onBack={handleBackToLogin}
+      />
     );
   }
 
@@ -56,6 +93,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
       <LoginForm
         onLogin={handleLogin}
         onRegister={handleRegister}
+        onPasswordSetup={handlePasswordSetup}
       />
     );
   }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { UserProfile } from "@/types";
 import LoginForm from "./LoginForm";
+import PasswordSetupForm from "./PasswordSetupForm";
 import UserProfileSetup from "../common/UserProfileSetup";
 
 interface AuthWrapperProps {
@@ -13,6 +14,7 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   const [setupEmail, setSetupEmail] = useState("");
 
   useEffect(() => {
@@ -43,7 +45,32 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
     setShowSetup(true);
   };
 
+  const handlePasswordSetup = (email: string) => {
+    setSetupEmail(email);
+    setShowPasswordSetup(true);
+  };
+
+  const handlePasswordSetupComplete = async () => {
+    // Password was set successfully, refresh user data
+    setShowPasswordSetup(false);
+    await checkAuthStatus();
+  };
+
+  const handleBackToLogin = () => {
+    setShowPasswordSetup(false);
+    setShowSetup(false);
+    setSetupEmail("");
+  };
+
   const handleSetupComplete = (profile: UserProfile) => {
+    // Check if this is a pending registration that needs password setup
+    if ((profile as any).needsPasswordSetup) {
+      setShowSetup(false);
+      setSetupEmail(profile.email); // Make sure email is set for password setup
+      setShowPasswordSetup(true);
+      return;
+    }
+    
     setUser(profile);
     setShowSetup(false);
   };
@@ -68,6 +95,16 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
     );
   }
 
+  if (showPasswordSetup) {
+    return (
+      <PasswordSetupForm
+        email={setupEmail}
+        onPasswordSet={handlePasswordSetupComplete}
+        onBack={handleBackToLogin}
+      />
+    );
+  }
+
   if (showSetup) {
     return (
       <UserProfileSetup
@@ -82,6 +119,7 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
       <LoginForm
         onLogin={handleLogin}
         onRegister={handleRegister}
+        onPasswordSetup={handlePasswordSetup}
       />
     );
   }

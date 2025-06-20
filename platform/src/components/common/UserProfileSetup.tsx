@@ -68,39 +68,29 @@ export default function UserProfileSetup({ email, onComplete }: UserProfileSetup
   const handleComplete = async () => {
     if (!selectedRole) return;
 
-    try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          role: selectedRole,
-          preferences,
-          agentConfig,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const profile: UserProfile = {
-          id: data.user.id,
-          email: data.user.email,
-          role: data.user.role,
-          preferences,
-          agentConfig,
-          createdAt: new Date(),
-          lastActive: new Date()
-        };
-        onComplete(profile);
-      } else {
-        const errorData = await response.json();
-        console.error('Registration failed:', errorData.error);
-        // You might want to show an error message to the user here
-      }
-    } catch (error) {
-      console.error('Registration error:', error);
-      // You might want to show an error message to the user here
-    }
+    // Store the setup data and redirect to password setup
+    // We'll pass this data to the password setup component
+    const setupData = {
+      email,
+      role: selectedRole,
+      preferences,
+      agentConfig,
+    };
+    
+    // Store in sessionStorage temporarily
+    sessionStorage.setItem('pendingRegistration', JSON.stringify(setupData));
+    
+    // Call onComplete with a special flag to indicate password setup is needed
+    onComplete({
+      id: 'pending',
+      email,
+      role: selectedRole,
+      preferences,
+      agentConfig,
+      createdAt: new Date(),
+      lastActive: new Date(),
+      needsPasswordSetup: true
+    } as any);
   };
 
   const getCreativityLabel = (value: number) => {

@@ -13,6 +13,7 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  password  String?  // Optional initially for migration, will be required after setup
   role      String   // 'analyst' | 'general_employee'
   createdAt DateTime @default(now())
   lastActive DateTime @default(now())

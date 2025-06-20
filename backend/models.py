@@ -30,6 +30,7 @@ class ChartType(str, Enum):
 class User(BaseModel):
     id: str
     email: str
+    password: Optional[str] = None  # Optional for migration compatibility
     role: Literal["analyst", "general_employee"]
 
 # Chat Models
@@ -173,6 +174,18 @@ class TokenData(BaseModel):
     user_id: str
     email: str
     role: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class SetPasswordRequest(BaseModel):
+    email: str
+    password: str
+
+class ResetPasswordRequest(BaseModel):
+    user_id: str
+    new_password: str
 
 class AuthResponse(BaseModel):
     access_token: str

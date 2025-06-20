@@ -4,7 +4,7 @@ import { UserPreferences, AgentConfiguration } from '@/types'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, role, preferences, agentConfig } = await request.json()
+    const { email, role, preferences, agentConfig, password } = await request.json()
 
     if (!email || !role || !preferences || !agentConfig) {
       return NextResponse.json(
@@ -30,13 +30,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create new user
+    // For new registrations, require password setup first
+    if (!password) {
+      return NextResponse.json(
+        { 
+          error: 'Password setup required',
+          needsPasswordSetup: true 
+        },
+        { status: 428 }
+      )
+    }
+
+    // Create new user with password
     const user = await createUser({
       email,
       role,
       preferences: preferences as UserPreferences,
       agentConfig: agentConfig as AgentConfiguration,
     })
+
+    // Set the password for the new user
+    const { setUserPassword } = await import('@/lib/auth')
+    await setUserPassword(user.id, password)
 
     // Create session
     const token = await createSession(user.id)

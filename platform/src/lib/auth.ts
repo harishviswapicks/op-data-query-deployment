@@ -2,6 +2,7 @@ import { prisma } from './db'
 import { UserProfile, UserPreferences, AgentConfiguration } from '@/types'
 import { cookies } from 'next/headers'
 import { randomBytes } from 'crypto'
+import bcrypt from 'bcryptjs'
 
 // Email domain validation
 export function isValidPrizePicksEmail(email: string): boolean {
@@ -192,6 +193,96 @@ export async function setSessionCookie(token: string): Promise<void> {
 export async function clearSessionCookie(): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.delete('session-token')
+}
+
+// Password management functions
+export function validatePassword(password: string): boolean {
+  /**
+   * Validate password meets requirements: 8+ chars, 1 letter, 1 number
+   */
+  if (password.length < 8) {
+    return false
+  }
+  
+  const hasLetter = /[a-zA-Z]/.test(password)
+  const hasNumber = /\d/.test(password)
+  
+  return hasLetter && hasNumber
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  /**
+   * Hash a password using bcrypt
+   */
+  const saltRounds = 12
+  return bcrypt.hash(password, saltRounds)
+}
+
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  /**
+   * Verify a password against its hash
+   */
+  return bcrypt.compare(password, hashedPassword)
+}
+
+export async function setUserPassword(userId: string, password: string): Promise<void> {
+  /**
+   * Set password for a user (used during migration)
+   */
+  const hashedPassword = await hashPassword(password)
+  
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword }
+  })
+}
+
+export async function updateUserPassword(userId: string, newPassword: string): Promise<void> {
+  /**
+   * Update user password (admin function)
+   */
+  const hashedPassword = await hashPassword(newPassword)
+  
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword }
+  })
+}
+
+export async function authenticateUser(email: string, password: string): Promise<UserProfile | null> {
+  /**
+   * Authenticate user with email and password
+   */
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: {
+      preferences: true,
+      agentConfig: true,
+    }
+  })
+
+  if (!user || !user.password) {
+    return null
+  }
+
+  const isValidPassword = await verifyPassword(password, user.password)
+  if (!isValidPassword) {
+    return null
+  }
+
+  return transformDbUserToProfile(user)
+}
+
+export async function userNeedsPasswordSetup(email: string): Promise<boolean> {
+  /**
+   * Check if user exists but doesn't have a password set (migration case)
+   */
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { password: true }
+  })
+
+  return user !== null && user.password === null
 }
 
 // Helper function to transform database user to UserProfile type
