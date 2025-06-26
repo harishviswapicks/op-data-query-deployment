@@ -1,0 +1,15 @@
+fastapi==0.115.6
+mangum==0.18.0
+python-multipart==0.0.12
+pydantic==2.10.3
+pydantic-settings==2.6.1
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.1
+google-cloud-bigquery==3.28.0
+google-auth==2.36.0
+pandas==2.2.3
+numpy==2.2.1
+requests==2.32.3
+httpx==0.28.1
+typing-extensions==4.12.2 
