@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Make startup script executable
+RUN chmod +x start.sh
+
 # Create database directory
 RUN mkdir -p /app/data
 
@@ -30,5 +33,5 @@ RUN python -c "from database import create_tables; create_tables()"
 # Expose port (Railway will set the PORT environment variable)
 EXPOSE 8000
 
-# Start the application
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"] 
+# Start the application using our startup script
+CMD ["./start.sh"] 
