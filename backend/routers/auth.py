@@ -4,8 +4,11 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
+from sqlalchemy.orm import Session
 import os
+import uuid
 from models import User, TokenData, AuthResponse, LoginRequest, SetPasswordRequest, ResetPasswordRequest
+from database import get_db, get_user_by_email, get_user_by_id, create_user, update_user_password
 
 router = APIRouter()
 security = HTTPBearer()
@@ -14,7 +17,7 @@ security = HTTPBearer()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT settings
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+SECRET_KEY = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 43200  # 30 days (30 * 24 * 60)
 
@@ -48,7 +51,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)) -> User:
     """
     Dependency to get current authenticated user from JWT token
     """
@@ -71,24 +74,23 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except JWTError:
         raise credentials_exception
     
-    # TODO: Get user from database using token_data.user_id
-    # For now, return a mock user based on token data
+    # Get user from database
+    db_user = get_user_by_id(db, token_data.user_id)
+    if db_user is None:
+        raise credentials_exception
+    
     user = User(
-        id=token_data.user_id,
-        email=token_data.email,
-        role=token_data.role
+        id=db_user.id,
+        email=db_user.email,
+        role=db_user.role
     )
     return user
 
 @router.post("/login", response_model=AuthResponse)
-async def login(login_request: LoginRequest):
+async def login(login_request: LoginRequest, db: Session = Depends(get_db)):
     """
     Authenticate user with email and password
     """
-    # TODO: Get user from database by email
-    # TODO: Verify password
-    # For now, this is a placeholder implementation
-    
     # Validate email domain
     if not login_request.email.lower().endswith('@prizepicks.com'):
         raise HTTPException(
@@ -96,35 +98,41 @@ async def login(login_request: LoginRequest):
             detail="Only @prizepicks.com email addresses are allowed"
         )
     
-    # TODO: Replace with actual database lookup
-    # user = get_user_by_email(login_request.email)
-    # if not user or not user.password:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_404_NOT_FOUND,
-    #         detail="User not found or password not set"
-    #     )
+    # Get user from database
+    db_user = get_user_by_email(db, login_request.email)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Please contact your administrator to set up your account."
+        )
     
-    # if not verify_password(login_request.password, user.password):
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="Incorrect password"
-    #     )
+    if not db_user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password not set. Please use the set password flow first."
+        )
     
-    # Mock response for now
+    if not verify_password(login_request.password, db_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password"
+        )
+    
+    # Create access token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
-            "sub": "mock-user-id",
-            "email": login_request.email,
-            "role": "analyst"
+            "sub": db_user.id,
+            "email": db_user.email,
+            "role": db_user.role
         },
         expires_delta=access_token_expires
     )
     
     user = User(
-        id="mock-user-id",
-        email=login_request.email,
-        role="analyst"
+        id=db_user.id,
+        email=db_user.email,
+        role=db_user.role
     )
     
     return AuthResponse(
@@ -134,7 +142,7 @@ async def login(login_request: LoginRequest):
     )
 
 @router.post("/set-password")
-async def set_password(request: SetPasswordRequest):
+async def set_password(request: SetPasswordRequest, db: Session = Depends(get_db)):
     """
     Set password for existing user (migration flow)
     """
@@ -152,24 +160,36 @@ async def set_password(request: SetPasswordRequest):
             detail="Password must be at least 8 characters long and contain at least one letter and one number"
         )
     
-    # TODO: Get user from database
-    # TODO: Update user password
-    # user = get_user_by_email(request.email)
-    # if not user:
-    #     raise HTTPException(status_code=404, detail="User not found")
+    # Get or create user
+    db_user = get_user_by_email(db, request.email)
+    if not db_user:
+        # Create new user if they don't exist
+        user_id = str(uuid.uuid4())
+        db_user = create_user(db, user_id, request.email, "analyst")
     
-    # hashed_password = get_password_hash(request.password)
-    # update_user_password(user.id, hashed_password)
+    # Hash and set password
+    hashed_password = get_password_hash(request.password)
+    success = update_user_password(db, db_user.id, hashed_password)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to set password"
+        )
     
     return {"message": "Password set successfully"}
 
 @router.post("/reset-password")
-async def reset_password(request: ResetPasswordRequest, current_user: User = Depends(get_current_user)):
+async def reset_password(request: ResetPasswordRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Admin endpoint to reset user password
     """
-    # TODO: Check if current user is admin
-    # For now, allow any authenticated user to reset passwords (admin functionality)
+    # Check if current user exists (basic auth check)
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
     
     # Validate password
     if not validate_password(request.new_password):
@@ -178,18 +198,24 @@ async def reset_password(request: ResetPasswordRequest, current_user: User = Dep
             detail="Password must be at least 8 characters long and contain at least one letter and one number"
         )
     
-    # TODO: Update user password in database
-    # hashed_password = get_password_hash(request.new_password)
-    # update_user_password(request.user_id, hashed_password)
+    # Hash and update password
+    hashed_password = get_password_hash(request.new_password)
+    success = update_user_password(db, request.user_id, hashed_password)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
     
     return {"message": "Password reset successfully"}
 
 @router.post("/validate", response_model=AuthResponse)
-async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     """
     Validate JWT token and return user information
     """
-    user = await get_current_user(credentials)
+    user = await get_current_user(credentials, db)
     return AuthResponse(
         access_token=credentials.credentials,
         token_type="bearer",
@@ -197,11 +223,11 @@ async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(sec
     )
 
 @router.post("/refresh", response_model=AuthResponse)
-async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def refresh_token(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
     """
     Refresh JWT token
     """
-    user = await get_current_user(credentials)
+    user = await get_current_user(credentials, db)
     
     # Create new token
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

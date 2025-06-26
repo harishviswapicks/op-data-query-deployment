@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
-from mangum import Mangum
+import os
 
 # Import routers from local api directory
 from routers import chat, bigquery, research, analytics, charts, scheduling, auth
@@ -18,7 +18,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://*.vercel.app",
-        "https://yourdomain.com",  # Replace with your actual domain
+        "https://operational-data-querying-x0xh0dy91-harishs-projects-d0eda66f.vercel.app",
         "http://localhost:3000",   # For local development
         "http://localhost:3002"    # For local development
     ],
@@ -47,5 +47,6 @@ async def root():
 async def health_check():
     return {"status": "healthy", "service": "production-backend"}
 
-# Vercel serverless handler
-handler = Mangum(app)
+@app.get("/health")
+async def health_check_simple():
+    return {"status": "healthy", "service": "production-backend"}
