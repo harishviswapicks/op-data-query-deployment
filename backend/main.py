@@ -2,19 +2,31 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 import uvicorn
+import os
 
 from routers import chat, bigquery, research, analytics, charts, scheduling, auth
+from database import create_tables
 
 app = FastAPI(
-    title="AI Data Platform - Analyst Backend",
-    description="FastAPI backend for the AI Data Platform analyst functionality",
+    title="AI Data Platform - Production Backend",
+    description="FastAPI backend for the AI Data Platform deployed to production",
     version="1.0.0"
 )
 
-# CORS middleware
+# Initialize database on startup
+@app.on_event("startup")
+async def startup_event():
+    create_tables()
+
+# CORS middleware for production
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3002", "http://localhost:3000"],  # Frontend URLs
+    allow_origins=[
+        "https://*.vercel.app",
+        "https://operational-data-querying-*.vercel.app", 
+        "http://localhost:3000",   # Local development
+        "http://localhost:3002"    # Local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
