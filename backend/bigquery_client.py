@@ -20,8 +20,20 @@ class BigQueryService:
     def _initialize_client(self):
         """Initialize the BigQuery client"""
         try:
-            if self.credentials_path and os.path.exists(self.credentials_path):
-                # Use service account credentials
+            # Try JSON credentials from environment variable first (for Railway)
+            credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+            if credentials_json:
+                import json
+                credentials_info = json.loads(credentials_json)
+                credentials = service_account.Credentials.from_service_account_info(
+                    credentials_info
+                )
+                self.client = bigquery.Client(
+                    credentials=credentials,
+                    project=self.project_id
+                )
+            elif self.credentials_path and os.path.exists(self.credentials_path):
+                # Use service account credentials file (for local development)
                 credentials = service_account.Credentials.from_service_account_file(
                     self.credentials_path
                 )
@@ -66,7 +78,7 @@ class BigQueryService:
                 "data": df.to_dict('records'),
                 "query": sql_query,
                 "bytes_processed": query_job.total_bytes_processed,
-                "execution_time": query_job.ended - query_job.started
+                "execution_time": (query_job.ended - query_job.started).total_seconds() if query_job.ended and query_job.started else None
             }
             
         except Exception as e:
