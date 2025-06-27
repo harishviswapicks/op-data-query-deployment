@@ -3,8 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 import uvicorn
 import os
+from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
 
 from routers import chat, bigquery, research, analytics, charts, scheduling, auth
+from slack_bot_handler import router as slack_bot_router
 from database import create_tables
 
 app = FastAPI(
@@ -43,6 +48,7 @@ app.include_router(research.router, prefix="/api/research", tags=["research"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(charts.router, prefix="/api/charts", tags=["charts"])
 app.include_router(scheduling.router, prefix="/api/scheduling", tags=["scheduling"])
+app.include_router(slack_bot_router, prefix="/api", tags=["slack-bot"])
 
 @app.get("/")
 async def root():
