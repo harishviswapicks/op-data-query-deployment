@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "name": "ai-data-platform-backend",
+  "builds": [
+    {
+      "src": "backend/main.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/health",
+      "dest": "backend/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "backend/main.py"
+    }
+  ],
+  "env": {
+    "DATABASE_URL": "sqlite:///./data/app.db",
+    "JWT_SECRET": "@jwt-secret"
+  }
+} 

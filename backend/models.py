@@ -151,6 +151,11 @@ class ScheduleConfig(BaseModel):
     timezone: str
     enabled: bool = True
 
+class SlackConfig(BaseModel):
+    notification_type: Literal["none", "channel", "dm"]
+    slack_channel: Optional[str] = None
+    slack_user_id: Optional[str] = None
+
 class ScheduledReport(BaseModel):
     id: str
     name: str
@@ -161,6 +166,7 @@ class ScheduledReport(BaseModel):
     created_at: datetime
     last_run: Optional[datetime] = None
     next_run: datetime
+    slack_config: Optional[SlackConfig] = None
 
 class ScheduleRequest(BaseModel):
     name: str
@@ -168,6 +174,39 @@ class ScheduleRequest(BaseModel):
     query: str
     schedule: ScheduleConfig
     user_id: str
+    slack_config: Optional[SlackConfig] = None
+
+# Slack Integration Models
+class SlackWorkspace(BaseModel):
+    id: str
+    team_id: str
+    team_name: str
+    webhook_url: Optional[str] = None
+    created_at: datetime
+    is_active: bool = True
+
+class SlackWorkspaceRequest(BaseModel):
+    team_id: str
+    team_name: str
+    bot_token: str
+    app_token: Optional[str] = None
+    webhook_url: Optional[str] = None
+
+class ReportExecution(BaseModel):
+    id: str
+    report_id: str
+    user_id: str
+    status: Literal["pending", "running", "completed", "failed"]
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    result_data: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    slack_message_ts: Optional[str] = None
+
+class SlackReportRequest(BaseModel):
+    report_id: str
+    user_id: str
+    force_run: bool = False
 
 # Authentication Models
 class TokenData(BaseModel):

@@ -116,8 +116,11 @@ Make complex analysis accessible while maintaining thoroughness."""
         # Role-specific tools
         if user.role == "analyst":
             tools.extend([
-                self.execute_bigquery,
+                self.list_available_datasets,
+                self.list_tables_in_dataset,
                 self.get_table_schema,
+                self.execute_bigquery,
+                self.preview_table_data,
                 self.create_chart_config,
                 self.analyze_query_performance
             ])
@@ -125,6 +128,7 @@ Make complex analysis accessible while maintaining thoroughness."""
         # General employee gets simplified data tools
         if user.role == "general_employee":
             tools.extend([
+                self.list_available_datasets,
                 self.simple_data_query,
                 self.get_basic_analytics
             ])
@@ -188,9 +192,29 @@ Make complex analysis accessible while maintaining thoroughness."""
     def execute_bigquery(self, sql_query: str) -> str:
         """Execute a BigQuery SQL query and return results."""
         try:
-            # This would integrate with your existing BigQuery functionality
-            # For now, return a placeholder
-            return f"BigQuery would execute: {sql_query}"
+            from bigquery_client import bigquery_service
+            
+            result = bigquery_service.execute_query(sql_query)
+            
+            if result["success"]:
+                # Format results for AI agent
+                summary = f"Query executed successfully!\n"
+                summary += f"Rows returned: {result['row_count']}\n"
+                summary += f"Columns: {', '.join(result['columns'])}\n\n"
+                
+                # Include sample data
+                if result["data"]:
+                    summary += "Sample data:\n"
+                    for i, row in enumerate(result["data"][:5]):  # Show first 5 rows
+                        summary += f"Row {i+1}: {row}\n"
+                    
+                    if result["row_count"] > 5:
+                        summary += f"... and {result['row_count'] - 5} more rows\n"
+                
+                return summary
+            else:
+                return f"Query failed: {result['error']}"
+                
         except Exception as e:
             logger.error(f"Error executing BigQuery: {e}")
             return f"Error executing query: {str(e)}"
@@ -198,8 +222,31 @@ Make complex analysis accessible while maintaining thoroughness."""
     def get_table_schema(self, table_name: str) -> str:
         """Get schema information for a BigQuery table."""
         try:
-            # Integrate with existing BigQuery schema functionality
-            return f"Schema for table {table_name}: [columns would be listed here]"
+            from bigquery_client import bigquery_service
+            
+            # Parse table name (dataset.table)
+            if "." in table_name:
+                dataset_id, table_id = table_name.split(".", 1)
+            else:
+                # Default dataset if none specified
+                dataset_id = "your_dataset"
+                table_id = table_name
+            
+            result = bigquery_service.get_table_schema(dataset_id, table_id)
+            
+            if result["success"]:
+                schema_text = f"Table: {result['table_id']}\n"
+                schema_text += f"Rows: {result['row_count']:,}\n"
+                schema_text += f"Columns:\n"
+                
+                for field in result["schema"]:
+                    desc = f" - {field['description']}" if field['description'] else ""
+                    schema_text += f"  {field['name']} ({field['type']}){desc}\n"
+                
+                return schema_text
+            else:
+                return f"Error getting schema: {result['error']}"
+                
         except Exception as e:
             logger.error(f"Error getting table schema: {e}")
             return f"Error retrieving schema: {str(e)}"
@@ -254,6 +301,84 @@ Make complex analysis accessible while maintaining thoroughness."""
         except Exception as e:
             logger.error(f"Error getting basic analytics: {e}")
             return f"Error retrieving analytics: {str(e)}"
+    
+    def list_available_datasets(self) -> str:
+        """List all available BigQuery datasets."""
+        try:
+            from bigquery_client import bigquery_service
+            
+            datasets = bigquery_service.list_datasets()
+            
+            if not datasets:
+                return "No datasets found or BigQuery not configured. Using mock data for demonstration."
+            
+            datasets_text = "Available datasets:\n"
+            for dataset in datasets:
+                mock_indicator = " (MOCK DATA)" if dataset.get("mock") else ""
+                datasets_text += f"📁 {dataset['dataset_id']}{mock_indicator}\n"
+                datasets_text += f"   Location: {dataset.get('location', 'Unknown')}\n"
+                if dataset.get('created'):
+                    datasets_text += f"   Created: {dataset['created']}\n"
+                datasets_text += "\n"
+            
+            return datasets_text.strip()
+            
+        except Exception as e:
+            logger.error(f"Error listing datasets: {e}")
+            return f"Error listing datasets: {str(e)}"
+    
+    def list_tables_in_dataset(self, dataset_id: str) -> str:
+        """List all tables in a specific dataset."""
+        try:
+            from bigquery_client import bigquery_service
+            
+            tables = bigquery_service.list_tables(dataset_id)
+            
+            if not tables:
+                return f"No tables found in dataset '{dataset_id}' or dataset doesn't exist."
+            
+            tables_text = f"Tables in dataset '{dataset_id}':\n\n"
+            for table in tables:
+                mock_indicator = " (MOCK DATA)" if table.get("mock") else ""
+                tables_text += f"📊 {table['table_id']}{mock_indicator}\n"
+                tables_text += f"   Rows: {table.get('num_rows', 'Unknown'):,}\n"
+                tables_text += f"   Size: {table.get('size_bytes', 0):,} bytes\n"
+                if table.get('modified'):
+                    tables_text += f"   Modified: {table['modified']}\n"
+                tables_text += "\n"
+            
+            return tables_text.strip()
+            
+        except Exception as e:
+            logger.error(f"Error listing tables: {e}")
+            return f"Error listing tables in dataset '{dataset_id}': {str(e)}"
+    
+    def preview_table_data(self, dataset_id: str, table_id: str, limit: int = 10) -> str:
+        """Preview sample data from a table."""
+        try:
+            from bigquery_client import bigquery_service
+            
+            result = bigquery_service.preview_table(dataset_id, table_id, limit)
+            
+            if not result["success"]:
+                return f"Error previewing table: {result.get('error', 'Unknown error')}"
+            
+            preview_text = f"Preview of {dataset_id}.{table_id} (showing {min(limit, result['row_count'])} of {result['row_count']} rows):\n\n"
+            preview_text += f"Columns: {', '.join(result['columns'])}\n\n"
+            
+            if result["data"]:
+                for i, row in enumerate(result["data"][:limit], 1):
+                    preview_text += f"Row {i}: {row}\n"
+            else:
+                preview_text += "No data found in table.\n"
+            
+            mock_indicator = "\n🔧 Note: This is mock data since BigQuery is not configured." if result.get("mock") else ""
+            
+            return preview_text + mock_indicator
+            
+        except Exception as e:
+            logger.error(f"Error previewing table: {e}")
+            return f"Error previewing table {dataset_id}.{table_id}: {str(e)}"
 
 # Global AI service instance
 ai_service = AIService() 

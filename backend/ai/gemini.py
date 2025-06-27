@@ -79,8 +79,8 @@ class Agent:
         if self._tool_declarations:
             tools = [Tool(function_declarations=self._tool_declarations)]
             config['tools'] = tools
-            # Disable automatic function calling for better control
-            config['automatic_function_calling'] = AutomaticFunctionCallingConfig(disable=True)
+            # Enable automatic function calling for better user experience
+            config['automatic_function_calling'] = AutomaticFunctionCallingConfig(disable=False)
         
         # Prepare history - combine initial_history with last_n_messages if provided
         history = self._initial_history or []
