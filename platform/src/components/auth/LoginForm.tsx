@@ -22,6 +22,18 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const testBackendConnection = async () => {
+    try {
+      console.log('🔍 Testing backend connection...');
+      const response = await apiClient.healthCheck();
+      console.log('✅ Backend health check successful:', response);
+      setError(`✅ Backend connected: ${response.status}`);
+    } catch (error: any) {
+      console.error('❌ Backend health check failed:', error);
+      setError(`❌ Backend connection failed: ${error.message}`);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
@@ -42,36 +54,48 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
       return;
     }
 
+    console.log('🔍 Login attempt:', { email: email.trim(), hasPassword: !!password, requiresPassword });
+
     try {
       if (requiresPassword && password) {
         // User has password set, attempt login with password
+        console.log('🔑 Attempting login with password');
         const data = await apiClient.login(email.trim(), password);
+        console.log('✅ Login successful:', data);
         onLogin(email.trim());
       } else {
         // First attempt - check if user exists and needs password
         try {
+          console.log('🔍 Checking if user exists (empty password attempt)');
           const data = await apiClient.login(email.trim(), '');
+          console.log('✅ Login successful with empty password:', data);
           onLogin(email.trim());
         } catch (error: any) {
           const errorMessage = error.message || '';
+          console.log('❌ First login attempt failed:', { error, errorMessage });
           
           if (errorMessage.includes('User not found') || errorMessage.includes('404')) {
+            console.log('👤 User not found, redirecting to registration');
             // User doesn't exist, redirect to registration
             onRegister(email.trim());
           } else if (errorMessage.includes('Incorrect password') || errorMessage.includes('Password required') || errorMessage.includes('password')) {
+            console.log('🔐 Password required, showing password field');
             // User has password set, require password input
             setRequiresPassword(true);
             setError('Please enter your password');
           } else if (errorMessage.includes('Password not set') || errorMessage.includes('No password set')) {
+            console.log('⚙️ Password not set, redirecting to password setup');
             // User exists but needs password setup
             onPasswordSetup(email.trim());
           } else {
+            console.log('🚨 Unknown error, re-throwing:', error);
             throw error; // Re-throw other errors
           }
         }
       }
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error('🚨 Login error:', error);
+      console.error('🚨 Error details:', { message: error.message, stack: error.stack });
       setError(error.message || 'Network error. Please try again.');
     } finally {
       setIsLoading(false);
@@ -172,6 +196,15 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
                   Continue
                 </div>
               )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={testBackendConnection}
+            >
+              Test Backend Connection
             </Button>
           </form>
 

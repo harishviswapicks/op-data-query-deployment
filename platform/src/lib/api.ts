@@ -28,6 +28,8 @@ export class ApiClient {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
+    console.log('🌐 API Request:', { url, method: options.method || 'GET', baseUrl: this.baseUrl });
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
@@ -43,16 +45,22 @@ export class ApiClient {
     };
 
     try {
+      console.log('📤 Sending request:', { url, config: { ...config, body: config.body ? JSON.parse(config.body as string) : undefined } });
       const response = await fetch(url, config);
+      
+      console.log('📥 Response received:', { status: response.status, statusText: response.statusText, ok: response.ok });
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.log('❌ Error response data:', errorData);
         throw new Error(errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json();
+      const responseData = await response.json();
+      console.log('✅ Success response data:', responseData);
+      return responseData;
     } catch (error) {
-      console.error(`API request failed: ${endpoint}`, error);
+      console.error(`🚨 API request failed: ${endpoint}`, error);
       throw error;
     }
   }
