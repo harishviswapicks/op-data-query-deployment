@@ -32,6 +32,8 @@ class User(BaseModel):
     email: str
     password: Optional[str] = None  # Optional for migration compatibility
     role: Literal["analyst", "general_employee"]
+    profile_completed: bool = False  # Track if user has completed profile setup
+    user_preferences: Optional[Dict[str, Any]] = None  # Store user preferences and agent config
 
 # Chat Models
 class ChatMessage(BaseModel):
@@ -225,6 +227,12 @@ class SetPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     user_id: str
     new_password: str
+
+class ProfileSetupRequest(BaseModel):
+    email: str
+    role: Literal["analyst", "general_employee"]
+    preferences: Dict[str, Any]
+    agent_config: Dict[str, Any]
 
 class AuthResponse(BaseModel):
     access_token: str

@@ -92,6 +92,18 @@ export class ApiClient {
     });
   }
 
+  async completeProfile(email: string, role: string, preferences: any, agentConfig: any): Promise<{ message: string }> {
+    return this.request('/api/auth/complete-profile', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        email, 
+        role, 
+        preferences, 
+        agent_config: agentConfig 
+      }),
+    });
+  }
+
   async validateToken(): Promise<{ access_token: string; token_type: string; user: any }> {
     return this.request('/api/auth/validate', {
       method: 'POST',

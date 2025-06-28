@@ -7,8 +7,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 import os
 import uuid
-from models import User, TokenData, AuthResponse, LoginRequest, SetPasswordRequest, ResetPasswordRequest
-from database import get_db, get_user_by_email, get_user_by_id, create_user, update_user_password
+from models import User, TokenData, AuthResponse, LoginRequest, SetPasswordRequest, ResetPasswordRequest, ProfileSetupRequest
+from database import get_db, get_user_by_email, get_user_by_id, create_user, update_user_password, update_user_profile
 
 router = APIRouter()
 security = HTTPBearer()
@@ -91,7 +91,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     user = User(
         id=str(db_user.id),
         email=str(db_user.email),
-        role=user_role  # type: ignore
+        role=user_role,  # type: ignore
+        profile_completed=bool(getattr(db_user, 'profile_completed', False)),
+        user_preferences=getattr(db_user, 'user_preferences', None)
     )
     return user
 
@@ -154,7 +156,9 @@ async def login(login_request: LoginRequest, db: Session = Depends(get_db)):
     user = User(
         id=str(db_user.id),
         email=str(db_user.email),
-        role=user_role  # type: ignore
+        role=user_role,  # type: ignore
+        profile_completed=bool(getattr(db_user, 'profile_completed', False)),
+        user_preferences=getattr(db_user, 'user_preferences', None)
     )
     
     return AuthResponse(
@@ -200,6 +204,43 @@ async def set_password(request: SetPasswordRequest, db: Session = Depends(get_db
         )
     
     return {"message": "Password set successfully"}
+
+@router.post("/complete-profile")
+async def complete_profile(request: ProfileSetupRequest, db: Session = Depends(get_db)):
+    """
+    Complete user profile setup (set role, preferences, and mark as completed)
+    """
+    # Validate email domain
+    if not request.email.lower().endswith('@prizepicks.com'):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only @prizepicks.com email addresses are allowed"
+        )
+    
+    # Get user from database
+    db_user = get_user_by_email(db, request.email)
+    if not db_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Combine preferences and agent config into user_preferences
+    combined_preferences = {
+        "preferences": request.preferences,
+        "agent_config": request.agent_config
+    }
+    
+    # Update user profile
+    success = update_user_profile(db, str(db_user.id), request.role, combined_preferences)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to complete profile setup"
+        )
+    
+    return {"message": "Profile setup completed successfully"}
 
 @router.post("/reset-password")
 async def reset_password(request: ResetPasswordRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):

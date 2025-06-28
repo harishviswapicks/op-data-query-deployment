@@ -28,6 +28,8 @@ class UserDB(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=True)  # Nullable for migration compatibility
     role = Column(String, nullable=False, default="analyst")
+    profile_completed = Column(Boolean, nullable=False, default=False)  # Track profile setup completion
+    user_preferences = Column(JSON, nullable=True)  # Store user preferences and agent config
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -136,6 +138,18 @@ def update_user_password(db: Session, user_id: str, password_hash: str) -> bool:
     db_user = get_user_by_id(db, user_id)
     if db_user:
         db_user.password_hash = password_hash
+        db_user.updated_at = datetime.utcnow()
+        db.commit()
+        return True
+    return False
+
+def update_user_profile(db: Session, user_id: str, role: str, preferences: dict) -> bool:
+    """Update user profile completion status and preferences"""
+    db_user = get_user_by_id(db, user_id)
+    if db_user:
+        db_user.role = role
+        db_user.profile_completed = True
+        db_user.user_preferences = preferences
         db_user.updated_at = datetime.utcnow()
         db.commit()
         return True

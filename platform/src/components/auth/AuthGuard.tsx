@@ -13,7 +13,7 @@ interface AuthGuardProps {
 
 export default function AuthGuard({ children }: AuthGuardProps) {
   // 🔒 AUTHENTICATION ENABLED
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, needsProfileSetup, pendingEmail } = useAuth();
   const [showSetup, setShowSetup] = useState(false);
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   const [setupEmail, setSetupEmail] = useState("");
@@ -47,16 +47,8 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   };
 
   const handleSetupComplete = async (profile: UserProfile) => {
-    // Check if this is a pending registration that needs password setup
-    if ((profile as any).needsPasswordSetup) {
-      setShowSetup(false);
-      setSetupEmail(profile.email); // Make sure email is set for password setup
-      setShowPasswordSetup(true);
-      return;
-    }
-    
-    setShowSetup(false);
-    // Refresh the auth context to get the new user
+    console.log('🎯 Profile setup completed, refreshing authentication');
+    // Profile setup is complete, refresh the auth context
     window.location.reload();
   };
 
@@ -85,6 +77,15 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     return (
       <UserProfileSetup
         email={setupEmail}
+        onComplete={handleSetupComplete}
+      />
+    );
+  }
+
+  if (needsProfileSetup && pendingEmail) {
+    return (
+      <UserProfileSetup
+        email={pendingEmail}
         onComplete={handleSetupComplete}
       />
     );

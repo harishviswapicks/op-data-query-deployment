@@ -68,29 +68,29 @@ export default function UserProfileSetup({ email, onComplete }: UserProfileSetup
   const handleComplete = async () => {
     if (!selectedRole) return;
 
-    // Store the setup data and redirect to password setup
-    // We'll pass this data to the password setup component
-    const setupData = {
-      email,
-      role: selectedRole,
-      preferences,
-      agentConfig,
-    };
-    
-    // Store in sessionStorage temporarily
-    sessionStorage.setItem('pendingRegistration', JSON.stringify(setupData));
-    
-    // Call onComplete with a special flag to indicate password setup is needed
-    onComplete({
-      id: 'pending',
-      email,
-      role: selectedRole,
-      preferences,
-      agentConfig,
-      createdAt: new Date(),
-      lastActive: new Date(),
-      needsPasswordSetup: true
-    } as any);
+    try {
+      // Import the apiClient dynamically to avoid import issues
+      const { apiClient } = await import('@/lib/api');
+      
+      // Call the backend to complete profile setup
+      await apiClient.completeProfile(email, selectedRole, preferences, agentConfig);
+      
+      // Create the complete user profile
+      const userProfile: UserProfile = {
+        id: 'temp-id', // Will be updated by backend
+        email,
+        role: selectedRole,
+        preferences,
+        agentConfig,
+        createdAt: new Date(),
+        lastActive: new Date(),
+      };
+      
+      onComplete(userProfile);
+    } catch (error) {
+      console.error('Profile setup failed:', error);
+      // Could add error handling UI here
+    }
   };
 
   const getCreativityLabel = (value: number) => {

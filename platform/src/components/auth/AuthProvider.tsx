@@ -7,6 +7,8 @@ import { apiClient, checkBackendHealth, handleApiError } from "@/lib/api";
 interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
+  needsProfileSetup: boolean;
+  pendingEmail: string | null;
   login: (email: string, token?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -31,6 +33,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsProfileSetup, setNeedsProfileSetup] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 
   const checkAuthStatus = async () => {
     try {
@@ -48,6 +52,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Try to get current user from backend
       const backendUser = await apiClient.getCurrentUser();
       
+      // Check if user has completed profile setup
+      if (!backendUser.profile_completed) {
+        console.log('👤 User needs to complete profile setup');
+        setNeedsProfileSetup(true);
+        setPendingEmail(backendUser.email);
+        setUser(null); // Force profile setup flow
+        return;
+      }
+
       // Convert backend user format to frontend UserProfile format
       const userProfile: UserProfile = {
         id: backendUser.id,
@@ -55,7 +68,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         role: backendUser.role,
         createdAt: new Date(),
         lastActive: new Date(),
-        preferences: {
+        preferences: backendUser.user_preferences?.preferences || {
           defaultAgentMode: 'quick',
           autoUpgradeToDeep: false,
           notificationChannels: ['slack'],
@@ -66,7 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           },
           favoriteDataSources: [],
         },
-        agentConfig: {
+        agentConfig: backendUser.user_preferences?.agent_config || {
           personality: 'professional',
           responseStyle: 'balanced',
           creativityLevel: 50,
@@ -97,6 +110,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     
     try {
       const backendUser = await apiClient.getCurrentUser();
+      
+      // Check if user has completed profile setup
+      if (!backendUser.profile_completed) {
+        console.log('👤 User needs to complete profile setup after login');
+        setNeedsProfileSetup(true);
+        setPendingEmail(backendUser.email);
+        setUser(null); // This will trigger the profile setup flow
+        return;
+      }
+
       // Convert backend user format to frontend UserProfile format
       const userProfile: UserProfile = {
         id: backendUser.id,
@@ -104,7 +127,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         role: backendUser.role,
         createdAt: new Date(),
         lastActive: new Date(),
-        preferences: {
+        preferences: backendUser.user_preferences?.preferences || {
           defaultAgentMode: 'quick',
           autoUpgradeToDeep: false,
           notificationChannels: ['slack'],
@@ -115,7 +138,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           },
           favoriteDataSources: [],
         },
-        agentConfig: {
+        agentConfig: backendUser.user_preferences?.agent_config || {
           personality: 'professional',
           responseStyle: 'balanced',
           creativityLevel: 50,
@@ -155,6 +178,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const value: AuthContextType = {
     user,
     isLoading,
+    needsProfileSetup,
+    pendingEmail,
     login,
     logout,
     refreshUser,
