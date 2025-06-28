@@ -58,11 +58,11 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
           if (errorMessage.includes('User not found') || errorMessage.includes('404')) {
             // User doesn't exist, redirect to registration
             onRegister(email.trim());
-          } else if (errorMessage.includes('Password required') || errorMessage.includes('password')) {
+          } else if (errorMessage.includes('Incorrect password') || errorMessage.includes('Password required') || errorMessage.includes('password')) {
             // User has password set, require password input
             setRequiresPassword(true);
             setError('Please enter your password');
-          } else if (errorMessage.includes('No password set')) {
+          } else if (errorMessage.includes('Password not set') || errorMessage.includes('No password set')) {
             // User exists but needs password setup
             onPasswordSetup(email.trim());
           } else {
