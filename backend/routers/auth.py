@@ -110,17 +110,25 @@ async def login(login_request: LoginRequest, db: Session = Depends(get_db)):
     # Get user from database
     db_user = get_user_by_email(db, login_request.email)
     if not db_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found. Please contact your administrator to set up your account."
-        )
+        # Create new user automatically for valid @prizepicks.com emails
+        user_id = str(uuid.uuid4())
+        db_user = create_user(db, user_id, login_request.email, "analyst")
     
+    # Check if user has password set
     if db_user.password_hash is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password not set. Please use the set password flow first."
+            detail="Password not set"
         )
     
+    # Handle empty password requests (frontend checking user status)
+    if not login_request.password or login_request.password.strip() == "":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password required"
+        )
+    
+    # Verify password
     if not verify_password(login_request.password, str(db_user.password_hash)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

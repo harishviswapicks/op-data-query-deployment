@@ -19,7 +19,8 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const [setupEmail, setSetupEmail] = useState("");
 
   const handleLogin = async (email: string, token?: string) => {
-    // Refresh the auth context to get the updated user
+    console.log('🎯 AuthGuard handleLogin called with token:', !!token);
+    // Token should already be stored by apiClient, just refresh auth context
     window.location.reload();
   };
 

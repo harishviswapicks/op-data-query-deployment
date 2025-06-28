@@ -62,6 +62,9 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
         console.log('🔑 Attempting login with password');
         const data = await apiClient.login(email.trim(), password);
         console.log('✅ Login successful:', data);
+        // Ensure token is stored
+        localStorage.setItem('auth_token', data.access_token);
+        apiClient.setToken(data.access_token);
         onLogin(email.trim(), data.access_token);
       } else {
         // First attempt - check user status by trying to login with empty password
@@ -80,7 +83,7 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
           } else if (errorMessage.includes('Password not set')) {
             console.log('⚙️ Password not set, redirecting to password setup');
             onPasswordSetup(email.trim());
-          } else if (errorMessage.includes('Incorrect password') || errorMessage.includes('Password required') || errorMessage.includes('password')) {
+          } else if (errorMessage.includes('Password required') || errorMessage.includes('Incorrect password')) {
             console.log('🔐 Password required, showing password field');
             setRequiresPassword(true);
             setError('Please enter your password');
