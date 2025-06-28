@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from ai.service import AIService
+from ai.gemini import Agent
 from slack.service import SlackService
 from database import (
     get_db, get_scheduled_report_by_id, get_user_by_id, create_report_execution,
@@ -164,7 +165,7 @@ class ReportGenerationService:
         
         return agent
 
-    async def generate_report(self, report_config: Dict[str, Any], user_role: str = "analyst") -> Dict[str, Any]:
+    async def generate_report_with_config(self, report_config: Dict[str, Any], user_role: str = "analyst") -> Dict[str, Any]:
         """Generate report using NBA agent pattern"""
         try:
             # Determine agent mode based on report type
@@ -338,7 +339,7 @@ class ReportGenerationService:
         
         # Generate the report
         logger.info(f"Sending prompt to {agent_mode.value} agent")
-        response = agent.run(prompt)
+        response = agent.tool_call(prompt)
         
         # Parse and structure the response
         report_data = self._parse_ai_response(response, report)
