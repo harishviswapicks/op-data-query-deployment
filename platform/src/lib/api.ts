@@ -1,9 +1,5 @@
 // API client for connecting frontend to FastAPI backend
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (
-  typeof window !== 'undefined' && window.location.origin 
-    ? `${window.location.origin}/api` 
-    : 'http://localhost:8000'
-);
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://operational-data-querying-production.up.railway.app';
 
 export interface ApiError {
   detail: string;
@@ -51,7 +47,7 @@ export class ApiClient {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       return await response.json();
@@ -62,6 +58,20 @@ export class ApiClient {
   }
 
   // Auth endpoints
+  async login(email: string, password: string): Promise<{ access_token: string; token_type: string; user: any }> {
+    return this.request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
+  async setPassword(email: string, password: string): Promise<{ message: string }> {
+    return this.request('/api/auth/set-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
   async validateToken(): Promise<{ access_token: string; token_type: string; user: any }> {
     return this.request('/api/auth/validate', {
       method: 'POST',
@@ -128,6 +138,13 @@ export class ApiClient {
     return this.request('/api/chat/upgrade-to-deep', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  // Test chat endpoint (unauthenticated)
+  async testChat(message: string, agentMode: 'quick' | 'deep' = 'quick'): Promise<any> {
+    return this.request(`/api/chat/test?message=${encodeURIComponent(message)}&agent_mode=${agentMode}`, {
+      method: 'POST',
     });
   }
 

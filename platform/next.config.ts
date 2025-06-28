@@ -12,12 +12,12 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: '/api/:path*',
+        destination: 'https://operational-data-querying-production.up.railway.app/api/:path*',
       },
     ];
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://operational-data-querying-production.up.railway.app',
   },
 };
 
