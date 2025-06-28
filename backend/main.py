@@ -47,16 +47,41 @@ def is_allowed_origin(origin: str) -> bool:
     return False
 
 # CORS middleware for production - Dynamic Vercel URL support
+# Custom CORS middleware that dynamically handles Vercel URLs
+@app.middleware("http")
+async def cors_handler(request, call_next):
+    # Get the origin from the request
+    origin = request.headers.get("origin")
+    
+    # Process the request
+    response = await call_next(request)
+    
+    # Check if origin should be allowed
+    if origin and is_allowed_origin(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    
+    # Handle preflight requests
+    if request.method == "OPTIONS":
+        if origin and is_allowed_origin(origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+    
+    return response
+
+# Fallback CORS middleware for basic functionality
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # Local development
+        # Local development only
         "http://localhost:3000",
         "http://localhost:3001", 
         "http://localhost:3002"
     ],
-    # Allow all Vercel deployment URLs dynamically
-    allow_origin_regex=r"^https://.*\.vercel\.app$|^http://localhost:(3000|3001|3002)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
