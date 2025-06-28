@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 import uvicorn
 import os
-import re
 from dotenv import load_dotenv
 
 # Load environment variables first
@@ -24,64 +23,19 @@ app = FastAPI(
 async def startup_event():
     create_tables()
 
-# CORS function to validate Vercel domains
-def is_allowed_origin(origin: str) -> bool:
-    """Check if origin is allowed based on patterns"""
-    if not origin:
-        return False
-    
-    # Local development
-    if origin in ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]:
-        return True
-    
-    # Vercel domains
-    vercel_patterns = [
-        r"^https://operational-data-querying.*\.vercel\.app$",
-        r"^https://.*\.vercel\.app$"
-    ]
-    
-    for pattern in vercel_patterns:
-        if re.match(pattern, origin):
-            return True
-    
-    return False
+
 
 # CORS middleware for production - Dynamic Vercel URL support
-# Custom CORS middleware that dynamically handles Vercel URLs
-@app.middleware("http")
-async def cors_handler(request, call_next):
-    # Get the origin from the request
-    origin = request.headers.get("origin")
-    
-    # Process the request
-    response = await call_next(request)
-    
-    # Check if origin should be allowed
-    if origin and is_allowed_origin(origin):
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "*"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-    
-    # Handle preflight requests
-    if request.method == "OPTIONS":
-        if origin and is_allowed_origin(origin):
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "*"
-            response.headers["Access-Control-Allow-Headers"] = "*"
-    
-    return response
-
-# Fallback CORS middleware for basic functionality
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # Local development only
+        # Local development
         "http://localhost:3000",
         "http://localhost:3001", 
         "http://localhost:3002"
     ],
+    # Allow all Vercel deployment URLs dynamically
+    allow_origin_regex=r"^https://.*\.vercel\.app$|^http://localhost:(3000|3001|3002)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
