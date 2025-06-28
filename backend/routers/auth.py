@@ -63,13 +63,17 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
+        user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        email = payload.get("email")
+        role = payload.get("role")
+        if email is None or role is None:
+            raise credentials_exception
         token_data = TokenData(
-            user_id=user_id,
-            email=payload.get("email"),
-            role=payload.get("role")
+            user_id=str(user_id),
+            email=str(email),
+            role=str(role)
         )
     except JWTError:
         raise credentials_exception
@@ -79,10 +83,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     if db_user is None:
         raise credentials_exception
     
+    # Ensure role is one of the valid types
+    user_role = str(db_user.role)
+    if user_role not in ["analyst", "general_employee"]:
+        user_role = "analyst"  # Default to analyst if invalid role
+    
     user = User(
-        id=db_user.id,
-        email=db_user.email,
-        role=db_user.role
+        id=str(db_user.id),
+        email=str(db_user.email),
+        role=user_role  # type: ignore
     )
     return user
 
@@ -106,13 +115,13 @@ async def login(login_request: LoginRequest, db: Session = Depends(get_db)):
             detail="User not found. Please contact your administrator to set up your account."
         )
     
-    if not db_user.password_hash:
+    if db_user.password_hash is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password not set. Please use the set password flow first."
         )
     
-    if not verify_password(login_request.password, db_user.password_hash):
+    if not verify_password(login_request.password, str(db_user.password_hash)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password"
@@ -122,17 +131,22 @@ async def login(login_request: LoginRequest, db: Session = Depends(get_db)):
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
-            "sub": db_user.id,
-            "email": db_user.email,
-            "role": db_user.role
+            "sub": str(db_user.id),
+            "email": str(db_user.email),
+            "role": str(db_user.role)
         },
         expires_delta=access_token_expires
     )
     
+    # Ensure role is one of the valid types
+    user_role = str(db_user.role)
+    if user_role not in ["analyst", "general_employee"]:
+        user_role = "analyst"  # Default to analyst if invalid role
+    
     user = User(
-        id=db_user.id,
-        email=db_user.email,
-        role=db_user.role
+        id=str(db_user.id),
+        email=str(db_user.email),
+        role=user_role  # type: ignore
     )
     
     return AuthResponse(
@@ -169,7 +183,7 @@ async def set_password(request: SetPasswordRequest, db: Session = Depends(get_db
     
     # Hash and set password
     hashed_password = get_password_hash(request.password)
-    success = update_user_password(db, db_user.id, hashed_password)
+    success = update_user_password(db, str(db_user.id), hashed_password)
     
     if not success:
         raise HTTPException(
@@ -252,3 +266,18 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     Get current user information
     """
     return current_user
+
+@router.get("/profile")
+async def get_user_profile(credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)):
+    """
+    Get user profile information (for frontend auth check)
+    """
+    try:
+        user = await get_current_user(credentials, db)
+        return {"user": user}
+    except HTTPException:
+        # Return 401 if token is invalid or user doesn't exist
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token"
+        )

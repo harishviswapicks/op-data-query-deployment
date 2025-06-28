@@ -12,18 +12,7 @@ interface AuthGuardProps {
 }
 
 export default function AuthGuard({ children }: AuthGuardProps) {
-  // 🚨 TEMPORARY: Bypass authentication for development
-  // TODO: Remove this bypass and restore proper authentication
-  
-  console.log("🔓 AUTH BYPASS ENABLED - Skipping authentication checks");
-  
-  // Return the main app directly without any auth checks
-  return <>{children}</>;
-  
-  /* 
-  // 🔒 COMMENTED OUT: Original authentication logic
-  // Uncomment this section to restore authentication
-  
+  // 🔒 AUTHENTICATION ENABLED
   const { user, isLoading } = useAuth();
   const [showSetup, setShowSetup] = useState(false);
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
@@ -111,5 +100,4 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   }
 
   return <>{children}</>;
-  */
 }

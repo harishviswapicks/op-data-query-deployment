@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { UserProfile } from "@/types";
+import { apiClient } from "@/lib/api";
 import LoginForm from "./LoginForm";
 import PasswordSetupForm from "./PasswordSetupForm";
 import UserProfileSetup from "../common/UserProfileSetup";
@@ -23,11 +24,8 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
 
   const checkAuthStatus = async () => {
     try {
-      const response = await fetch('/api/user/profile');
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      }
+      const data = await apiClient.getUserProfile();
+      setUser(data.user);
     } catch (error) {
       console.error('Auth check failed:', error);
     } finally {

@@ -38,12 +38,6 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
     e.preventDefault();
     if (!email.trim()) return;
 
-    // If password is required but not provided, show error
-    if (requiresPassword && !password.trim()) {
-      setError('Password is required');
-      return;
-    }
-
     setIsLoading(true);
     setError("");
 
@@ -54,53 +48,51 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
       return;
     }
 
-    console.log('🔍 Login attempt:', { email: email.trim(), hasPassword: !!password, requiresPassword });
+    console.log('🔍 Authentication attempt:', { email: email.trim(), hasPassword: !!password, requiresPassword });
 
     try {
-      if (requiresPassword && password) {
-        // User has password set, attempt login with password
+      if (requiresPassword) {
+        // User has been prompted for password, attempt login
+        if (!password.trim()) {
+          setError('Password is required');
+          setIsLoading(false);
+          return;
+        }
+        
         console.log('🔑 Attempting login with password');
         const data = await apiClient.login(email.trim(), password);
         console.log('✅ Login successful:', data);
-        // Store token and pass it to the auth provider
-        localStorage.setItem('auth_token', data.access_token);
         onLogin(email.trim(), data.access_token);
       } else {
-        // First attempt - check if user exists and needs password
+        // First attempt - check user status by trying to login with empty password
         try {
-          console.log('🔍 Checking if user exists (empty password attempt)');
+          console.log('🔍 Checking user status');
           const data = await apiClient.login(email.trim(), '');
-          console.log('✅ Login successful with empty password:', data);
-          // Store token and pass it to the auth provider
-          localStorage.setItem('auth_token', data.access_token);
+          console.log('✅ User authenticated (no password required):', data);
           onLogin(email.trim(), data.access_token);
         } catch (error: any) {
           const errorMessage = error.message || '';
-          console.log('❌ First login attempt failed:', { error, errorMessage });
+          console.log('❌ Initial login attempt failed:', { errorMessage });
           
           if (errorMessage.includes('User not found') || errorMessage.includes('404')) {
             console.log('👤 User not found, redirecting to registration');
-            // User doesn't exist, redirect to registration
             onRegister(email.trim());
+          } else if (errorMessage.includes('Password not set')) {
+            console.log('⚙️ Password not set, redirecting to password setup');
+            onPasswordSetup(email.trim());
           } else if (errorMessage.includes('Incorrect password') || errorMessage.includes('Password required') || errorMessage.includes('password')) {
             console.log('🔐 Password required, showing password field');
-            // User has password set, require password input
             setRequiresPassword(true);
             setError('Please enter your password');
-          } else if (errorMessage.includes('Password not set') || errorMessage.includes('No password set')) {
-            console.log('⚙️ Password not set, redirecting to password setup');
-            // User exists but needs password setup
-            onPasswordSetup(email.trim());
           } else {
-            console.log('🚨 Unknown error, re-throwing:', error);
-            throw error; // Re-throw other errors
+            console.log('🚨 Unknown error:', error);
+            throw error;
           }
         }
       }
     } catch (error: any) {
-      console.error('🚨 Login error:', error);
-      console.error('🚨 Error details:', { message: error.message, stack: error.stack });
-      setError(error.message || 'Network error. Please try again.');
+      console.error('🚨 Authentication error:', error);
+      setError(error.message || 'Authentication failed. Please try again.');
     } finally {
       setIsLoading(false);
     }

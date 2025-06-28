@@ -108,6 +108,10 @@ export class ApiClient {
     return this.request('/api/auth/me');
   }
 
+  async getUserProfile(): Promise<{ user: any }> {
+    return this.request('/api/user/profile');
+  }
+
   // Chat endpoints
   async sendMessage(data: {
     message: string;
