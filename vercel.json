@@ -1,0 +1,11 @@
+{
+  "buildCommand": "cd platform && npm run build",
+  "devCommand": "cd platform && npm run dev",
+  "installCommand": "cd platform && npm install",
+  "outputDirectory": "platform/.next",
+  "framework": "nextjs",
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://operational-data-querying-production.up.railway.app",
+    "NODE_ENV": "production"
+  }
+} 
