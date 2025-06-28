@@ -35,7 +35,7 @@ export default function AuthWrapper({ children }: AuthWrapperProps) {
     }
   };
 
-  const handleLogin = async (email: string) => {
+  const handleLogin = async (email: string, token?: string) => {
     // Login successful, refresh user data
     await checkAuthStatus();
   };

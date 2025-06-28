@@ -17,7 +17,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   const [setupEmail, setSetupEmail] = useState("");
 
-  const handleLogin = async (email: string) => {
+  const handleLogin = async (email: string, token?: string) => {
     // Refresh the auth context to get the updated user
     window.location.reload();
   };

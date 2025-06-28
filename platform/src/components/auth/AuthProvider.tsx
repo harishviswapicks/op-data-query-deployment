@@ -8,7 +8,7 @@ interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
   backendAvailable: boolean;
-  login: (email: string) => Promise<void>;
+  login: (email: string, token?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -44,6 +44,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const isBackendUp = await checkBackendStatus();
       
       if (isBackendUp) {
+        // Check for stored token
+        const storedToken = localStorage.getItem('auth_token');
+        if (storedToken) {
+          console.log('🔑 Found stored token, attempting to restore session');
+          apiClient.setToken(storedToken);
+        }
+        
         // Try to get current user from backend
         try {
           const backendUser = await apiClient.getCurrentUser();
@@ -73,8 +80,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
           };
           setUser(userProfile);
+          console.log('✅ Restored user session from backend:', userProfile);
         } catch (error) {
-          console.log('Backend auth check failed, falling back to local auth');
+          console.log('Backend auth check failed, clearing stored token and falling back to local auth');
+          // Clear invalid token
+          localStorage.removeItem('auth_token');
+          apiClient.clearToken();
           // Fall back to local auth system
           await checkLocalAuthStatus();
         }
@@ -105,17 +116,57 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const login = async (email: string) => {
+  const login = async (email: string, token?: string) => {
     // Check if backend is available first
     const isBackendUp = await checkBackendStatus();
     
-    if (isBackendUp) {
-      // For now, we'll use local auth but prepare for backend integration
-      // TODO: Implement backend login when auth endpoints are ready
-      console.log('Backend available but using local auth for now');
+    if (isBackendUp && token) {
+      // Backend authentication successful - store token and get user info
+      console.log('Using backend authentication with token');
+      apiClient.setToken(token);
+      
+      try {
+        const backendUser = await apiClient.getCurrentUser();
+        // Convert backend user format to frontend UserProfile format
+        const userProfile: UserProfile = {
+          id: backendUser.id,
+          email: backendUser.email,
+          role: backendUser.role,
+          createdAt: new Date(),
+          lastActive: new Date(),
+          preferences: {
+            defaultAgentMode: 'quick',
+            autoUpgradeToDeep: false,
+            notificationChannels: ['slack'],
+            workingHours: {
+              start: '09:00',
+              end: '17:00',
+              timezone: 'America/New_York',
+            },
+            favoriteDataSources: [],
+          },
+          agentConfig: {
+            personality: 'professional',
+            responseStyle: 'balanced',
+            creativityLevel: 50,
+            responseLength: 'standard',
+          }
+        };
+        setUser(userProfile);
+        console.log('✅ Backend user authenticated:', userProfile);
+        return;
+      } catch (error) {
+        console.error('Failed to get user info with backend token:', error);
+        // Fall through to local auth
+      }
     }
     
-    // Use local auth system
+    if (isBackendUp && !token) {
+      // Backend is available but no token provided - this shouldn't happen in normal flow
+      console.log('Backend available but no token provided - falling back to local auth');
+    }
+    
+    // Fall back to local auth system
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -136,6 +187,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (backendAvailable) {
         apiClient.clearToken();
       }
+      
+      // Clear stored token
+      localStorage.removeItem('auth_token');
       
       // Clear local session
       await fetch('/api/auth/logout', { method: 'POST' });

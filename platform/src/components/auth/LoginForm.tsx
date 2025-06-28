@@ -9,7 +9,7 @@ import Image from "next/image";
 import { apiClient } from "@/lib/api";
 
 interface LoginFormProps {
-  onLogin: (email: string) => void;
+  onLogin: (email: string, token: string) => void;
   onRegister: (email: string) => void;
   onPasswordSetup: (email: string) => void;
 }
@@ -62,14 +62,18 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
         console.log('🔑 Attempting login with password');
         const data = await apiClient.login(email.trim(), password);
         console.log('✅ Login successful:', data);
-        onLogin(email.trim());
+        // Store token and pass it to the auth provider
+        localStorage.setItem('auth_token', data.access_token);
+        onLogin(email.trim(), data.access_token);
       } else {
         // First attempt - check if user exists and needs password
         try {
           console.log('🔍 Checking if user exists (empty password attempt)');
           const data = await apiClient.login(email.trim(), '');
           console.log('✅ Login successful with empty password:', data);
-          onLogin(email.trim());
+          // Store token and pass it to the auth provider
+          localStorage.setItem('auth_token', data.access_token);
+          onLogin(email.trim(), data.access_token);
         } catch (error: any) {
           const errorMessage = error.message || '';
           console.log('❌ First login attempt failed:', { error, errorMessage });
