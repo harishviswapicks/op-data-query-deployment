@@ -50,13 +50,14 @@ def is_allowed_origin(origin: str) -> bool:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://platform-iota-plum.vercel.app",  # Specific Vercel deployment
+        "https://platform-iota-plum.vercel.app",  # Original Vercel deployment
         "https://operational-data-querying-lsetytc05-harishs-projects-d0eda66f.vercel.app",  # Alternative Vercel URL
+        "https://platform-9dgx4pi1t-harishs-projects-d0eda66f.vercel.app",  # New Vercel deployment URL
         "http://localhost:3000",
         "http://localhost:3001", 
         "http://localhost:3002"
     ],
-    allow_origin_regex=r"^https://.*\.vercel\.app$|^http://localhost:(3000|3001|3002)$",
+    allow_origin_regex=r"^https://.*\\.vercel\\.app$|^http://localhost:(3000|3001|3002)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
