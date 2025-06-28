@@ -28,6 +28,56 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  // 🚨 TEMPORARY: Bypass authentication for development
+  // TODO: Remove this bypass and restore proper authentication
+  
+  console.log("🔓 AUTH PROVIDER BYPASS ENABLED - Using mock user");
+  
+  // Mock user for development
+  const mockUser: UserProfile = {
+    id: "dev-user-123",
+    email: "harish.viswanathan@prizepicks.com",
+    role: "analyst",
+    createdAt: new Date(),
+    lastActive: new Date(),
+    preferences: {
+      defaultAgentMode: 'quick',
+      autoUpgradeToDeep: false,
+      notificationChannels: ['slack'],
+      workingHours: {
+        start: '09:00',
+        end: '17:00',
+        timezone: 'America/New_York',
+      },
+      favoriteDataSources: [],
+    },
+    agentConfig: {
+      personality: 'professional',
+      responseStyle: 'balanced',
+      creativityLevel: 50,
+      responseLength: 'standard',
+    }
+  };
+
+  const value: AuthContextType = {
+    user: mockUser,
+    isLoading: false,
+    backendAvailable: true,
+    login: async () => { console.log("🔓 Mock login - bypassed"); },
+    logout: async () => { console.log("🔓 Mock logout - bypassed"); },
+    refreshUser: async () => { console.log("🔓 Mock refresh - bypassed"); },
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+  
+  /* 
+  // 🔒 COMMENTED OUT: Original authentication logic
+  // Uncomment this section to restore authentication
+  
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [backendAvailable, setBackendAvailable] = useState(false);
@@ -222,4 +272,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
       {children}
     </AuthContext.Provider>
   );
+  */
 }
