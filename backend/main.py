@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 import uvicorn
 import os
+import re
 from dotenv import load_dotenv
 
 # Load environment variables first
@@ -23,15 +24,39 @@ app = FastAPI(
 async def startup_event():
     create_tables()
 
+# CORS function to validate Vercel domains
+def is_allowed_origin(origin: str) -> bool:
+    """Check if origin is allowed based on patterns"""
+    if not origin:
+        return False
+    
+    # Local development
+    if origin in ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"]:
+        return True
+    
+    # Vercel domains
+    vercel_patterns = [
+        r"^https://operational-data-querying.*\.vercel\.app$",
+        r"^https://.*\.vercel\.app$"
+    ]
+    
+    for pattern in vercel_patterns:
+        if re.match(pattern, origin):
+            return True
+    
+    return False
+
 # CORS middleware for production
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://*.vercel.app",
-        "https://operational-data-querying-*.vercel.app", 
-        "http://localhost:3000",   # Local development
-        "http://localhost:3002"    # Local development
+        "https://platform-iota-plum.vercel.app",  # Specific Vercel deployment
+        "https://operational-data-querying-lsetytc05-harishs-projects-d0eda66f.vercel.app",  # Alternative Vercel URL
+        "http://localhost:3000",
+        "http://localhost:3001", 
+        "http://localhost:3002"
     ],
+    allow_origin_regex=r"^https://.*\.vercel\.app$|^http://localhost:(3000|3001|3002)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
