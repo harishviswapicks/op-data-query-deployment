@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
 import Image from "next/image";
+import { apiClient } from "@/lib/api";
 
 interface PasswordSetupFormProps {
   email: string;
@@ -55,48 +56,12 @@ export default function PasswordSetupForm({ email, onPasswordSet, onBack }: Pass
     setError("");
 
     try {
-      // Check if this is a new registration or existing user password setup
-      const pendingRegistration = sessionStorage.getItem('pendingRegistration');
-      
-      if (pendingRegistration) {
-        // Complete registration with password
-        const registrationData = JSON.parse(pendingRegistration);
-        const response = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...registrationData,
-            password: password
-          }),
-        });
-
-        if (response.ok) {
-          sessionStorage.removeItem('pendingRegistration');
-          onPasswordSet();
-        } else {
-          const data = await response.json();
-          setError(data.error || 'Failed to complete registration');
-        }
-      } else {
-        // Existing user setting password
-        const response = await fetch('/api/auth/set-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            email: email,
-            password: password 
-          }),
-        });
-
-        if (response.ok) {
-          onPasswordSet();
-        } else {
-          const data = await response.json();
-          setError(data.error || 'Failed to set password');
-        }
-      }
-    } catch (error) {
-      setError('Network error. Please try again.');
+      // Use apiClient to set password (works for both new registration and existing users)
+      await apiClient.setPassword(email, password);
+      onPasswordSet();
+    } catch (error: any) {
+      console.error('Password setup error:', error);
+      setError(error.message || 'Failed to set password. Please try again.');
     } finally {
       setIsLoading(false);
     }

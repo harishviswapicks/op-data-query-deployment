@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Mail, LogIn, Lock, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
+import { apiClient } from "@/lib/api";
 
 interface LoginFormProps {
   onLogin: (email: string) => void;
@@ -42,37 +43,36 @@ export default function LoginForm({ onLogin, onRegister, onPasswordSetup }: Logi
     }
 
     try {
-      // Prepare login request
-      const loginData: any = { email: email.trim() };
       if (requiresPassword && password) {
-        loginData.password = password;
-      }
-
-      const loginResponse = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginData),
-      });
-
-      const data = await loginResponse.json();
-
-      if (loginResponse.ok) {
+        // User has password set, attempt login with password
+        const data = await apiClient.login(email.trim(), password);
         onLogin(email.trim());
-      } else if (loginResponse.status === 404) {
-        // User doesn't exist, redirect to registration
-        onRegister(email.trim());
-      } else if (loginResponse.status === 428 && data.needsPasswordSetup) {
-        // User exists but needs password setup
-        onPasswordSetup(email.trim());
-      } else if (loginResponse.status === 400 && data.requiresPassword) {
-        // User has password set, require password input
-        setRequiresPassword(true);
-        setError('Please enter your password');
       } else {
-        setError(data.error || 'Login failed');
+        // First attempt - check if user exists and needs password
+        try {
+          const data = await apiClient.login(email.trim(), '');
+          onLogin(email.trim());
+        } catch (error: any) {
+          const errorMessage = error.message || '';
+          
+          if (errorMessage.includes('User not found') || errorMessage.includes('404')) {
+            // User doesn't exist, redirect to registration
+            onRegister(email.trim());
+          } else if (errorMessage.includes('Password required') || errorMessage.includes('password')) {
+            // User has password set, require password input
+            setRequiresPassword(true);
+            setError('Please enter your password');
+          } else if (errorMessage.includes('No password set')) {
+            // User exists but needs password setup
+            onPasswordSetup(email.trim());
+          } else {
+            throw error; // Re-throw other errors
+          }
+        }
       }
-    } catch (error) {
-      setError('Network error. Please try again.');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.message || 'Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
