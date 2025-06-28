@@ -188,24 +188,29 @@ class Agent:
                     return self._send_function_results_memory(function_results)
                 else:
                     # No function call, return text response
-                    if response.text is not None and response.text.strip():
-                        return response.text
-                    else:
-                        # Check for text parts
-                        text_parts = []
-                        if hasattr(response, 'candidates') and response.candidates:
-                            for part in response.candidates[0].content.parts:
-                                if hasattr(part, 'text') and part.text and part.text.strip():
-                                    text_parts.append(part.text)
-                        
-                        if text_parts:
-                            return ''.join(text_parts)
+                    try:
+                        if hasattr(response, 'text') and response.text is not None and response.text.strip():
+                            return response.text
                         else:
-                            return "No response generated."
+                            # Check for text parts
+                            text_parts = []
+                            if hasattr(response, 'candidates') and response.candidates:
+                                for part in response.candidates[0].content.parts:
+                                    if hasattr(part, 'text') and part.text and part.text.strip():
+                                        text_parts.append(part.text)
+                            
+                            if text_parts:
+                                return ''.join(text_parts)
+                            else:
+                                return "No response generated."
+                    except Exception as text_error:
+                        self._log(f"Error accessing response text: {text_error}", "error")
+                        return "Response generated but could not be retrieved."
                         
             except Exception as e:
                 self._log(f"Error in memory-enabled tool call: {e}", "error")
-                raise
+                # Return a graceful error message instead of raising
+                return f"I encountered an issue processing your request: {str(e)}. Please try rephrasing your question."
         else:
             # Use stateless approach for tool calls when memory is disabled
             user_content = Content(role="user", parts=[Part(text=prompt)])
@@ -231,9 +236,10 @@ class Agent:
                 
                 # Check if there are function calls (could be multiple for parallel calling)
                 function_calls = []
-                for part in response.candidates[0].content.parts:
-                    if part.function_call:
-                        function_calls.append(part.function_call)
+                if hasattr(response, 'candidates') and response.candidates and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        if hasattr(part, 'function_call') and part.function_call:
+                            function_calls.append(part.function_call)
                 
                 if function_calls:
                     self._log(f"Function calls detected: {len(function_calls)}")
@@ -263,12 +269,25 @@ class Agent:
                     return self._send_function_results_stateless(conversation_contents, function_results)
                 else:
                     # No function call, return text response
-                    return response.text
+                    try:
+                        if hasattr(response, 'text') and response.text is not None:
+                            return response.text
+                        else:
+                            # Try to get text from candidates
+                            text_parts = []
+                            if hasattr(response, 'candidates') and response.candidates:
+                                for part in response.candidates[0].content.parts:
+                                    if hasattr(part, 'text') and part.text:
+                                        text_parts.append(part.text)
+                            return ''.join(text_parts) if text_parts else "No response generated."
+                    except Exception as text_error:
+                        self._log(f"Error accessing response text: {text_error}", "error")
+                        return "Response generated but could not be retrieved."
                     
             except Exception as e:
                 self._log(f"Error in tool call: {e}", "error")
-                raise
-
+                # Return a graceful error message instead of raising
+                return f"I encountered an issue processing your request: {str(e)}. Please try rephrasing your question."
 
     def chat(self, prompt: str, generation_config: typing.Optional[typing.Dict[str, typing.Any]] = None) -> str:
         """Send a message to the model and return text response"""
