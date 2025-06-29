@@ -21,7 +21,15 @@ app = FastAPI(
 # Initialize database on startup
 @app.on_event("startup")
 async def startup_event():
-    create_tables()
+    try:
+        print("🗄️ Creating database tables...")
+        create_tables()
+        print("✅ Database tables created successfully")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        # Don't crash the app, but log the error
+        import traceback
+        traceback.print_exc()
 
 
 
