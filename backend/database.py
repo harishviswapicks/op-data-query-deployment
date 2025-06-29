@@ -12,7 +12,11 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
 if DATABASE_URL.startswith("sqlite"):
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 else:
-    engine = create_engine(DATABASE_URL)
+    # PostgreSQL with SSL support for Railway
+    connect_args = {}
+    if "railway" in DATABASE_URL or "postgres" in DATABASE_URL:
+        connect_args["sslmode"] = "require"
+    engine = create_engine(DATABASE_URL, connect_args=connect_args)
 
 # Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -106,7 +110,16 @@ class ReportExecutionDB(Base):
 
 # Create tables
 def create_tables():
-    Base.metadata.create_all(bind=engine)
+    try:
+        print(f"🔍 Database URL: {DATABASE_URL[:50]}...")
+        print("🗄️ Creating database tables...")
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created successfully")
+    except Exception as e:
+        print(f"❌ Database table creation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 # Dependency to get database session
 def get_db() -> Generator[Session, None, None]:
