@@ -42,6 +42,10 @@ export class ApiClient {
     
     console.log('🌐 API Request:', { url, method: options.method || 'GET', baseUrl: this.baseUrl });
     
+    // Add timeout for production reliability
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
@@ -54,11 +58,14 @@ export class ApiClient {
     const config: RequestInit = {
       ...options,
       headers,
+      signal: controller.signal,
     };
 
     try {
       console.log('📤 Sending request:', { url, config: { ...config, body: config.body ? JSON.parse(config.body as string) : undefined } });
       const response = await fetch(url, config);
+      
+      clearTimeout(timeoutId); // Clear timeout on successful response
       
       console.log('📥 Response received:', { status: response.status, statusText: response.statusText, ok: response.ok });
       
@@ -71,7 +78,20 @@ export class ApiClient {
       const responseData = await response.json();
       console.log('✅ Success response data:', responseData);
       return responseData;
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId); // Clear timeout on error
+      
+      // Handle specific error types
+      if (error.name === 'AbortError') {
+        console.error(`⏰ API request timeout: ${endpoint}`);
+        throw new Error('Request timeout - please check your internet connection');
+      }
+      
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        console.error(`🌐 Network error: ${endpoint}`, error);
+        throw new Error('Network error - please check if the backend service is running');
+      }
+      
       console.error(`🚨 API request failed: ${endpoint}`, error);
       throw error;
     }

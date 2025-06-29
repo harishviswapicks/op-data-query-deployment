@@ -12,6 +12,7 @@ interface AuthContextType {
   login: (email: string, token?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  completeProfileSetup: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setNeedsProfileSetup(true);
         setPendingEmail(backendUser.email);
         setUser(null); // Force profile setup flow
+        setIsLoading(false); // Important: Stop loading state
         return;
       }
 
@@ -117,6 +119,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setNeedsProfileSetup(true);
         setPendingEmail(backendUser.email);
         setUser(null); // This will trigger the profile setup flow
+        setIsLoading(false); // Important: Stop loading state
         return;
       }
 
@@ -171,6 +174,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await checkAuthStatus();
   };
 
+  const completeProfileSetup = async () => {
+    setNeedsProfileSetup(false);
+    setPendingEmail(null);
+    await checkAuthStatus();
+  };
+
   useEffect(() => {
     checkAuthStatus();
   }, []);
@@ -183,6 +192,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     refreshUser,
+    completeProfileSetup,
   };
 
   return (

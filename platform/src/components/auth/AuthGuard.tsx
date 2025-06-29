@@ -13,7 +13,7 @@ interface AuthGuardProps {
 
 export default function AuthGuard({ children }: AuthGuardProps) {
   // 🔒 AUTHENTICATION ENABLED
-  const { user, isLoading, needsProfileSetup, pendingEmail } = useAuth();
+  const { user, isLoading, needsProfileSetup, pendingEmail, completeProfileSetup } = useAuth();
   const [showSetup, setShowSetup] = useState(false);
   const [showPasswordSetup, setShowPasswordSetup] = useState(false);
   const [setupEmail, setSetupEmail] = useState("");
@@ -21,7 +21,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const handleLogin = async (email: string, token?: string) => {
     console.log('🎯 AuthGuard handleLogin called with token:', !!token);
     // Token should already be stored by apiClient, just refresh auth context
-    window.location.reload();
+    await completeProfileSetup();
   };
 
   const handleRegister = (email: string) => {
@@ -37,7 +37,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const handlePasswordSetupComplete = async () => {
     // Password was set successfully, refresh user data
     setShowPasswordSetup(false);
-    window.location.reload();
+    await completeProfileSetup();
   };
 
   const handleBackToLogin = () => {
@@ -49,7 +49,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const handleSetupComplete = async (profile: UserProfile) => {
     console.log('🎯 Profile setup completed, refreshing authentication');
     // Profile setup is complete, refresh the auth context
-    window.location.reload();
+    await completeProfileSetup();
   };
 
   if (isLoading) {

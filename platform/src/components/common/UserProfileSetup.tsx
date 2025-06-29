@@ -75,6 +75,8 @@ export default function UserProfileSetup({ email, onComplete }: UserProfileSetup
       // Call the backend to complete profile setup
       await apiClient.completeProfile(email, selectedRole, preferences, agentConfig);
       
+      console.log('✅ Profile setup completed successfully');
+      
       // Create the complete user profile
       const userProfile: UserProfile = {
         id: 'temp-id', // Will be updated by backend

@@ -26,14 +26,21 @@ async def startup_event():
 
 
 # CORS middleware for production - Dynamic Vercel URL support
+allowed_origins = [
+    # Local development
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://localhost:3002"
+]
+
+# Add production origins from environment
+cors_origins = os.getenv("ALLOWED_ORIGINS")
+if cors_origins:
+    allowed_origins.extend([origin.strip() for origin in cors_origins.split(",")])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        # Local development
-        "http://localhost:3000",
-        "http://localhost:3001", 
-        "http://localhost:3002"
-    ],
+    allow_origins=allowed_origins,
     # Allow all Vercel deployment URLs dynamically
     allow_origin_regex=r"^https://.*\.vercel\.app$|^http://localhost:(3000|3001|3002)$",
     allow_credentials=True,
@@ -46,7 +53,6 @@ security = HTTPBearer()
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["authentication"])
-app.include_router(auth.router, prefix="/api/user", tags=["user"])  # Add user endpoints
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(bigquery.router, prefix="/api/bigquery", tags=["bigquery"])
 app.include_router(research.router, prefix="/api/research", tags=["research"])
