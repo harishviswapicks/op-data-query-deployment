@@ -380,12 +380,16 @@ Example: For "how is our business performing?", explore datasets, analyze key me
     
     def list_tables_in_dataset(self, dataset_id: str) -> str:
         """List all tables in a specific dataset."""
+        logger.info(f"🔍 list_tables_in_dataset() called with dataset_id: {dataset_id}")
         try:
             from bigquery_client import bigquery_service
+            logger.info("✅ bigquery_service imported successfully for tables")
             
             tables = bigquery_service.list_tables(dataset_id)
+            logger.info(f"📊 Found {len(tables) if tables else 0} tables in dataset '{dataset_id}'")
             
             if not tables:
+                logger.warning(f"⚠️ No tables found in dataset '{dataset_id}'")
                 return f"No tables found in dataset '{dataset_id}' or dataset doesn't exist."
             
             tables_text = f"Tables in dataset '{dataset_id}':\n\n"
@@ -398,10 +402,13 @@ Example: For "how is our business performing?", explore datasets, analyze key me
                     tables_text += f"   Modified: {table['modified']}\n"
                 tables_text += "\n"
             
+            logger.info(f"✅ Successfully formatted tables response (length: {len(tables_text)})")
             return tables_text.strip()
             
         except Exception as e:
-            logger.error(f"Error listing tables: {e}")
+            logger.error(f"❌ Error in list_tables_in_dataset: {e}")
+            import traceback
+            logger.error(f"🔧 Full traceback: {traceback.format_exc()}")
             return f"Error listing tables in dataset '{dataset_id}': {str(e)}"
     
     def preview_table_data(self, dataset_id: str, table_id: str, limit: int = 10) -> str:
