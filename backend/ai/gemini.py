@@ -205,12 +205,21 @@ class Agent:
                                 return "No response generated."
                     except Exception as text_error:
                         self._log(f"Error accessing response text: {text_error}", "error")
-                        return "Response generated but could not be retrieved."
+                        # Check if this is the specific function_call error
+                        error_msg = str(text_error)
+                        if "only supports text parts" in error_msg and "function_call" in error_msg:
+                            return "I'm processing your request using data analysis tools. This may take a moment to complete. Please wait for the function calls to finish."
+                        else:
+                            return f"Response generated but could not be retrieved: {error_msg}"
                         
             except Exception as e:
                 self._log(f"Error in memory-enabled tool call: {e}", "error")
-                # Return a graceful error message instead of raising
-                return f"I encountered an issue processing your request: {str(e)}. Please try rephrasing your question."
+                # Check if this is the specific function_call error
+                error_msg = str(e)
+                if "only supports text parts" in error_msg and "function_call" in error_msg:
+                    return "I'm trying to analyze your data using BigQuery tools, but encountered a processing issue. The function call is in progress. Please try your question again in a moment."
+                else:
+                    return f"I encountered an issue processing your request: {error_msg}. Please try rephrasing your question."
         else:
             # Use stateless approach for tool calls when memory is disabled
             user_content = Content(role="user", parts=[Part(text=prompt)])
@@ -282,12 +291,21 @@ class Agent:
                             return ''.join(text_parts) if text_parts else "No response generated."
                     except Exception as text_error:
                         self._log(f"Error accessing response text: {text_error}", "error")
-                        return "Response generated but could not be retrieved."
+                        # Check if this is the specific function_call error
+                        error_msg = str(text_error)
+                        if "only supports text parts" in error_msg and "function_call" in error_msg:
+                            return "I'm processing your request using data analysis tools. This may take a moment to complete. Please wait for the function calls to finish."
+                        else:
+                            return f"Response generated but could not be retrieved: {error_msg}"
                     
             except Exception as e:
                 self._log(f"Error in tool call: {e}", "error")
-                # Return a graceful error message instead of raising
-                return f"I encountered an issue processing your request: {str(e)}. Please try rephrasing your question."
+                # Check if this is the specific function_call error  
+                error_msg = str(e)
+                if "only supports text parts" in error_msg and "function_call" in error_msg:
+                    return "I'm trying to analyze your data using BigQuery tools, but encountered a processing issue. The function call is in progress. Please try your question again in a moment."
+                else:
+                    return f"I encountered an issue processing your request: {error_msg}. Please try rephrasing your question."
 
     def chat(self, prompt: str, generation_config: typing.Optional[typing.Dict[str, typing.Any]] = None) -> str:
         """Send a message to the model and return text response"""

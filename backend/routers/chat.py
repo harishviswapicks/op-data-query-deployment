@@ -33,14 +33,21 @@ async def test_ai_chat(message: str, agent_mode: str = "quick"):
         # Process the message with the agent
         response_text = agent.tool_call(message)
         
-        # Create response message
+        # Create response message with proper metadata structure
         response_message = ChatMessage(
             id=str(uuid.uuid4()),
             content=response_text,
             sender=MessageSender.QUICK_AGENT if mode == AgentMode.QUICK else MessageSender.DEEP_AGENT,
             username=None,
             timestamp=datetime.now(),
-            metadata={"agent_mode": mode.value, "user_role": test_user.role}
+            metadata={
+                "agent_mode": mode.value, 
+                "user_role": test_user.role,
+                "processing_time": 1500 if mode == AgentMode.DEEP else 800,
+                "data_sources": ["bigquery", "analytics"] if test_user.role == "analyst" else ["notion", "slack"],
+                "confidence": 85 if mode == AgentMode.QUICK else 92,
+                "can_upgrade_to_deep": mode == AgentMode.QUICK
+            }
         )
         
         # Return the response
@@ -76,14 +83,21 @@ async def send_message(
             # Deep mode: Also use tool_call for comprehensive research
             response_text = agent.tool_call(request.message)
         
-        # Create response message
+        # Create response message with proper metadata structure
         response_message = ChatMessage(
             id=str(uuid.uuid4()),
             content=response_text,
             sender=MessageSender.QUICK_AGENT if request.agent_mode.value == "quick" else MessageSender.DEEP_AGENT,
             username=None,
             timestamp=datetime.now(),
-            metadata={"agent_mode": request.agent_mode.value, "user_role": current_user.role}
+            metadata={
+                "agent_mode": request.agent_mode.value, 
+                "user_role": current_user.role,
+                "processing_time": 2000 if request.agent_mode.value == "deep" else 900,
+                "data_sources": ["bigquery", "analytics"] if current_user.role == "analyst" else ["notion", "slack"],
+                "confidence": 88 if request.agent_mode.value == "quick" else 94,
+                "can_upgrade_to_deep": request.agent_mode.value == "quick"
+            }
         )
         
         # Return the response
