@@ -423,28 +423,37 @@ class Agent:
                 return self._send_function_results_memory(recursive_function_results)
             
             # No more function calls, check for text response
-            if hasattr(response, 'text') and response.text is not None and response.text.strip():
-                self._log(f"Returning response.text: {response.text[:100]}{'...' if len(response.text) > 100 else ''}")
-                return response.text
-            else:
-                # Check for text parts in candidates
-                text_parts = []
-                if hasattr(response, 'candidates') and response.candidates:
-                    self._log(f"Checking {len(response.candidates)} candidates for text parts")
-                    for candidate in response.candidates:
-                        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                            for part in candidate.content.parts:
-                                if hasattr(part, 'text') and part.text and part.text.strip():
-                                    text_parts.append(part.text)
-                                    self._log(f"Found text part: {part.text[:100]}{'...' if len(part.text) > 100 else ''}")
-                
-                if text_parts:
-                    result_text = ''.join(text_parts)
-                    self._log(f"Returning joined text parts: {result_text[:100]}{'...' if len(result_text) > 100 else ''}")
-                    return result_text
+            try:
+                if hasattr(response, 'text') and response.text is not None and response.text.strip():
+                    self._log(f"Returning response.text: {response.text[:100]}{'...' if len(response.text) > 100 else ''}")
+                    return response.text
                 else:
-                    self._log("No text content found in final response", "warning")
-                    return "Function executed successfully, but no response was generated."
+                    # Check for text parts in candidates
+                    text_parts = []
+                    if hasattr(response, 'candidates') and response.candidates:
+                        self._log(f"Checking {len(response.candidates)} candidates for text parts")
+                        for candidate in response.candidates:
+                            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                                for part in candidate.content.parts:
+                                    if hasattr(part, 'text') and part.text and part.text.strip():
+                                        text_parts.append(part.text)
+                                        self._log(f"Found text part: {part.text[:100]}{'...' if len(part.text) > 100 else ''}")
+                    
+                    if text_parts:
+                        result_text = ''.join(text_parts)
+                        self._log(f"Returning joined text parts: {result_text[:100]}{'...' if len(result_text) > 100 else ''}")
+                        return result_text
+                    else:
+                        self._log("No text content found in final response", "warning")
+                        return "Function executed successfully, but no response was generated."
+            except Exception as text_error:
+                self._log(f"Error accessing response text after function results: {text_error}", "error")
+                error_msg = str(text_error)
+                if "only supports text parts" in error_msg and "function_call" in error_msg:
+                    self._log("Response contains function_call instead of text - this indicates the AI wants to make more function calls", "warning")
+                    return "I successfully retrieved your data and am continuing to analyze it. The analysis requires multiple data sources and is still processing. Please try your question again in a moment."
+                else:
+                    return f"Function executed but could not retrieve final response: {error_msg}"
             
         except Exception as e:
             self._log(f"Error sending function results (memory): {e}", "error")
