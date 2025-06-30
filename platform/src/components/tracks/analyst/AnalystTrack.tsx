@@ -174,77 +174,104 @@ export default function AnalystTrack({ userProfile, uiState, onUIStateChange }: 
     setIsLoading(true);
 
     try {
-      // Simulate different response times based on agent mode
-      const isDeepMode = uiState.agentMode === 'deep';
-      const processingTime = isDeepMode ? Math.random() * 2000 + 1000 : Math.random() * 1000 + 500;
-
-      if (isDeepMode) {
-        // Create research job for deep mode
-        const researchJob: ResearchJob = {
-          id: `research_${Date.now()}`,
-          query: currentInput,
-          type: 'analyst',
-          agentMode: 'deep',
-          status: 'running',
-          progress: 0,
-          estimatedDuration: 300 + Math.random() * 300, // 5-10 minutes
-          createdAt: new Date(),
-          userId: userProfile.id,
-          priority: 'normal'
+      // Import API client dynamically to avoid SSR issues
+      const { apiClient, checkBackendHealth, handleApiError } = await import('@/lib/api');
+      
+      // Check if backend is available
+      const backendAvailable = await checkBackendHealth();
+      
+      if (backendAvailable) {
+        // Use backend API
+        console.log('Using backend API for chat');
+        
+        const response = await apiClient.sendMessage({
+          message: currentInput,
+          agent_mode: uiState.agentMode,
+          user_id: userProfile.id,
+          context: {
+            dataSources: ['bigquery', 'analytics'],
+            sessionId: `analyst_${Date.now()}`,
+          }
+        });
+        
+        const botMessage: Message = {
+          id: response.message.id,
+          content: response.message.content,
+          sender: uiState.agentMode === 'deep' ? "deep_agent" : "quick_agent",
+          agentType: "analyst",
+          timestamp: new Date(response.message.timestamp),
+          metadata: {
+            agentMode: uiState.agentMode,
+            processingTime: response.message.metadata?.processingTime || 0,
+            dataSources: response.message.metadata?.dataSources || ['bigquery'],
+            confidence: response.message.metadata?.confidence,
+            researchJobId: response.message.metadata?.researchJobId,
+            canUpgradeToDeep: response.message.metadata?.canUpgradeToDeep
+          }
         };
+        
+        setMessages(prev => [...prev, botMessage]);
+        
+        // If deep research job was created, track it
+        if (response.research_job_id) {
+          console.log('Deep research job created:', response.research_job_id);
+          // Create research job tracking
+          const researchJob: ResearchJob = {
+            id: response.research_job_id,
+            query: currentInput,
+            type: 'analyst',
+            agentMode: 'deep',
+            status: 'running',
+            progress: 0,
+            estimatedDuration: 300,
+            createdAt: new Date(),
+            userId: userProfile.id,
+            priority: 'normal'
+          };
+          setActiveResearchJobs(prev => [...prev, researchJob]);
+        }
+        
+      } else {
+        // Fallback to simplified mock when backend is not available
+        console.log('Backend not available, using simplified fallback');
+        
+        const fallbackResponse = `🚫 **Backend Connection Issue**
+        
+I'm unable to connect to the backend API to process your request: "${currentInput}"
 
-        setActiveResearchJobs(prev => [...prev, researchJob]);
-        onUIStateChange(prev => ({
-          ...prev,
-          activeResearchJobs: [...prev.activeResearchJobs, researchJob]
-        }));
+**Please check:**
+- Backend service is running
+- Network connectivity
+- API configuration
 
-        // Immediate acknowledgment for deep research
-        const ackMessage: Message = {
+**For testing:** You can verify the backend at:
+https://operational-data-querying-production.up.railway.app/health
+
+*This is a fallback response when the backend is unavailable.*`;
+
+        const botMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: `🔬 **Deep Research Initiated**\n\nI'm conducting a comprehensive analysis of your query: "${currentInput}"\n\n**What I'm doing:**\n- Analyzing multiple BigQuery tables\n- Cross-referencing historical data\n- Generating detailed visualizations\n- Identifying patterns and anomalies\n\n**Estimated completion:** ${Math.ceil(researchJob.estimatedDuration / 60)} minutes\n\nI'll notify you via Slack when the analysis is complete. You can continue using the platform normally.`,
-          sender: "deep_agent",
+          content: fallbackResponse,
+          sender: uiState.agentMode === 'deep' ? "deep_agent" : "quick_agent",
           agentType: "analyst",
           timestamp: new Date(),
           metadata: {
-            agentMode: 'deep',
-            processingTime: 1000,
-            dataSources: ['bigquery', 'analytics'],
-            researchJobId: researchJob.id
+            agentMode: uiState.agentMode,
+            processingTime: 0,
+            dataSources: []
           }
         };
-
-        setTimeout(() => {
-          setMessages(prev => [...prev, ackMessage]);
-          setIsLoading(false);
-        }, processingTime);
-      } else {
-        // Quick mode response
-        setTimeout(() => {
-          const quickResponse = generateQuickResponse(currentInput);
-          const botMessage: Message = {
-            id: (Date.now() + 1).toString(),
-            content: quickResponse,
-            sender: "quick_agent",
-            agentType: "analyst",
-            timestamp: new Date(),
-            metadata: {
-              agentMode: 'quick',
-              processingTime,
-              dataSources: ['bigquery'],
-              confidence: 85,
-              canUpgradeToDeep: true
-            }
-          };
-          setMessages(prev => [...prev, botMessage]);
-          setIsLoading(false);
-        }, processingTime);
+        
+        setMessages(prev => [...prev, botMessage]);
       }
+      
     } catch (error) {
       console.error("Error sending message:", error);
+      const { handleApiError } = await import('@/lib/api');
+      
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `Sorry, I encountered an error processing your request. Please try again.`,
+        content: `❌ **API Error**\n\nSorry, I encountered an error while processing your message: ${handleApiError(error)}\n\n**Request:** "${currentInput}"\n\nPlease try again or check if the backend service is running.`,
         sender: uiState.agentMode === 'deep' ? "deep_agent" : "quick_agent",
         agentType: "analyst",
         timestamp: new Date(),
@@ -255,10 +282,10 @@ export default function AnalystTrack({ userProfile, uiState, onUIStateChange }: 
         }
       };
       setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
+      inputRef.current?.focus();
     }
-
-    inputRef.current?.focus();
   };
 
   const generateQuickResponse = (query: string): string => {
