@@ -178,8 +178,13 @@ class Agent:
                         
                         if target_function:
                             self._log(f"Executing function: {function_name} with args: {function_args}")
-                            function_result = target_function(**function_args)
-                            function_results.append((function_name, function_result))
+                            try:
+                                function_result = target_function(**function_args)
+                                self._log(f"✅ Function {function_name} completed successfully. Result length: {len(str(function_result))}")
+                                function_results.append((function_name, function_result))
+                            except Exception as func_error:
+                                self._log(f"❌ Function {function_name} failed: {func_error}", "error")
+                                function_results.append((function_name, f"Function execution error: {str(func_error)}"))
                         else:
                             self._log(f"Function {function_name} not found in tools", "error")
                             function_results.append((function_name, f"Error: Function {function_name} not found"))
@@ -268,8 +273,13 @@ class Agent:
                         
                         if target_function:
                             self._log(f"Executing function: {function_name} with args: {function_args}")
-                            function_result = target_function(**function_args)
-                            function_results.append((function_name, function_result))
+                            try:
+                                function_result = target_function(**function_args)
+                                self._log(f"✅ Function {function_name} completed successfully. Result length: {len(str(function_result))}")
+                                function_results.append((function_name, function_result))
+                            except Exception as func_error:
+                                self._log(f"❌ Function {function_name} failed: {func_error}", "error")
+                                function_results.append((function_name, f"Function execution error: {str(func_error)}"))
                         else:
                             self._log(f"Function {function_name} not found in tools", "error")
                             function_results.append((function_name, f"Error: Function {function_name} not found"))

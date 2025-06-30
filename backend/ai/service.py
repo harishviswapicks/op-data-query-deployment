@@ -348,12 +348,16 @@ Example: For "how is our business performing?", explore datasets, analyze key me
     
     def list_available_datasets(self) -> str:
         """List all available BigQuery datasets."""
+        logger.info("🔍 list_available_datasets() called")
         try:
             from bigquery_client import bigquery_service
+            logger.info("✅ bigquery_service imported successfully")
             
             datasets = bigquery_service.list_datasets()
+            logger.info(f"📊 Found {len(datasets)} datasets")
             
             if not datasets:
+                logger.warning("⚠️ No datasets found, returning mock data message")
                 return "No datasets found or BigQuery not configured. Using mock data for demonstration."
             
             datasets_text = "Available datasets:\n"
@@ -365,10 +369,13 @@ Example: For "how is our business performing?", explore datasets, analyze key me
                     datasets_text += f"   Created: {dataset['created']}\n"
                 datasets_text += "\n"
             
+            logger.info(f"✅ Successfully formatted datasets response (length: {len(datasets_text)})")
             return datasets_text.strip()
             
         except Exception as e:
-            logger.error(f"Error listing datasets: {e}")
+            logger.error(f"❌ Error in list_available_datasets: {e}")
+            import traceback
+            logger.error(f"🔧 Full traceback: {traceback.format_exc()}")
             return f"Error listing datasets: {str(e)}"
     
     def list_tables_in_dataset(self, dataset_id: str) -> str:
