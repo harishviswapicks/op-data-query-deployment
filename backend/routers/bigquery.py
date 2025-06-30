@@ -5,6 +5,9 @@ from routers.auth import get_current_user
 from bigquery_client import bigquery_service
 import os
 import logging
+import json
+from google.oauth2 import service_account
+from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -184,3 +187,63 @@ async def validate_sql_query(
     """
     # TODO: Validate SQL query syntax
     pass
+
+@router.get("/debug-credentials")
+async def debug_credentials():
+    """
+    Debug endpoint to test credential parsing and BigQuery client initialization
+    """
+    debug_info = {}
+    
+    try:
+        # Check environment variables
+        project_id = os.getenv("BIGQUERY_PROJECT_ID")
+        credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        
+        debug_info["project_id"] = project_id
+        debug_info["credentials_json_length"] = len(credentials_json) if credentials_json else 0
+        debug_info["credentials_json_preview"] = credentials_json[:100] + "..." if credentials_json else "None"
+        
+        # Test JSON parsing
+        if not credentials_json:
+            debug_info["json_parse_success"] = False
+            debug_info["json_parse_error"] = "credentials_json is None or empty"
+            return debug_info
+            
+        try:
+            credentials_info = json.loads(credentials_json)
+            debug_info["json_parse_success"] = True
+            debug_info["json_keys"] = list(credentials_info.keys())
+        except Exception as e:
+            debug_info["json_parse_success"] = False
+            debug_info["json_parse_error"] = str(e)
+            return debug_info
+        
+        # Test credentials creation
+        try:
+            credentials = service_account.Credentials.from_service_account_info(credentials_info)
+            debug_info["credentials_creation_success"] = True
+        except Exception as e:
+            debug_info["credentials_creation_success"] = False
+            debug_info["credentials_creation_error"] = str(e)
+            return debug_info
+        
+        # Test BigQuery client creation
+        try:
+            client = bigquery.Client(credentials=credentials, project=project_id)
+            debug_info["client_creation_success"] = True
+            
+            # Test a simple operation
+            datasets = list(client.list_datasets(max_results=1))
+            debug_info["client_test_success"] = True
+            debug_info["datasets_count"] = len(datasets)
+            
+        except Exception as e:
+            debug_info["client_creation_success"] = False
+            debug_info["client_creation_error"] = str(e)
+        
+        return debug_info
+        
+    except Exception as e:
+        debug_info["overall_error"] = str(e)
+        return debug_info
