@@ -7,6 +7,7 @@ import logging
 from models import ChatRequest, ChatResponse, ChatMessage, User, MessageSender, AgentMode
 from routers.auth import get_current_user
 from ai.service import ai_service
+from database import get_db, create_chat_message, get_chat_history as db_get_chat_history
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -72,20 +73,73 @@ async def send_message(
     Send a message to the AI agent (quick or deep mode)
     """
     try:
-        # Create AI agent for the current user and mode
-        agent = ai_service.create_chat_agent(current_user, request.agent_mode)
+        # First save the user's message to maintain history
+        db = next(get_db())
+        user_message_id = str(uuid.uuid4())
+        create_chat_message(
+            db=db,
+            message_id=user_message_id,
+            content=request.message,
+            sender="user",
+            user_id=current_user.id
+        )
+        
+        # Load recent chat history for memory (last 10 messages)
+        recent_messages = db_get_chat_history(db, current_user.id, limit=10)
+        db.close()
+        
+        # Convert to format expected by Agent class
+        chat_history = []
+        for msg in reversed(recent_messages):  # Reverse to get chronological order
+            sender_value = str(msg.sender).lower()  # Convert to string for comparison
+            if sender_value == "user":
+                chat_history.append({"role": "user", "content": msg.content})
+            else:
+                chat_history.append({"role": "model", "content": msg.content})
+        
+        # Create AI agent for the current user and mode with memory
+        agent = ai_service.create_chat_agent(current_user, request.agent_mode, memory=True)
+        
+        # Inject recent chat history into agent memory
+        if chat_history:
+            logger.info(f"Loading {len(chat_history)} previous messages into agent memory")
+            agent.inject_messages(chat_history)
+        
+        # Enhance the user prompt to better trigger tool usage for data queries
+        enhanced_prompt = request.message
+        if any(keyword in request.message.lower() for keyword in ['trends', 'data', 'dataset', 'query', 'show', 'analyze', 'find']):
+            enhanced_prompt = f"""User query: {request.message}
+
+Please analyze this request and use your available tools to provide real data insights. If the user is asking about trends, datasets, or specific data, make sure to:
+1. Search for relevant datasets using list_available_datasets()
+2. Explore specific datasets using list_tables_in_dataset() 
+3. Execute queries using execute_bigquery() when appropriate
+4. Provide actual data-driven answers, not generic responses"""
         
         # Process the message with the agent
         if request.agent_mode.value == "quick":
             # Quick mode: Return immediate response
-            response_text = agent.tool_call(request.message)
+            response_text = agent.tool_call(enhanced_prompt)
         else:
             # Deep mode: Also use tool_call for comprehensive research
-            response_text = agent.tool_call(request.message)
+            response_text = agent.tool_call(enhanced_prompt)
+        
+        # Save the agent's response to maintain history
+        db = next(get_db())
+        response_message_id = str(uuid.uuid4())
+        agent_sender = "quick_agent" if request.agent_mode.value == "quick" else "deep_agent"
+        create_chat_message(
+            db=db,
+            message_id=response_message_id,
+            content=response_text,
+            sender=agent_sender,
+            user_id=current_user.id
+        )
+        db.close()
         
         # Create response message with proper metadata structure
         response_message = ChatMessage(
-            id=str(uuid.uuid4()),
+            id=response_message_id,
             content=response_text,
             sender=MessageSender.QUICK_AGENT if request.agent_mode.value == "quick" else MessageSender.DEEP_AGENT,
             username=None,
@@ -96,7 +150,9 @@ async def send_message(
                 "processing_time": 2000 if request.agent_mode.value == "deep" else 900,
                 "data_sources": ["bigquery", "analytics"] if current_user.role == "analyst" else ["notion", "slack"],
                 "confidence": 88 if request.agent_mode.value == "quick" else 94,
-                "can_upgrade_to_deep": request.agent_mode.value == "quick"
+                "can_upgrade_to_deep": request.agent_mode.value == "quick",
+                "memory_loaded": len(chat_history) > 0,
+                "history_messages_count": len(chat_history)
             }
         )
         
@@ -108,6 +164,8 @@ async def send_message(
         
     except Exception as e:
         logger.error(f"Error processing chat message: {e}")
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing your message: {str(e)}"
