@@ -201,43 +201,81 @@ async def debug_credentials():
         credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
         
         debug_info["project_id"] = project_id
+        debug_info["project_id_set"] = bool(project_id)
+        debug_info["credentials_json_set"] = bool(credentials_json)
         debug_info["credentials_json_length"] = len(credentials_json) if credentials_json else 0
-        debug_info["credentials_json_preview"] = credentials_json[:100] + "..." if credentials_json else "None"
+        
+        if credentials_json:
+            # Show first and last 50 characters to help identify format issues
+            debug_info["credentials_json_start"] = credentials_json[:50]
+            debug_info["credentials_json_end"] = credentials_json[-50:]
+            
+            # Check for common formatting issues
+            debug_info["starts_with_brace"] = credentials_json.strip().startswith("{")
+            debug_info["ends_with_brace"] = credentials_json.strip().endswith("}")
+            debug_info["contains_type"] = '"type"' in credentials_json
+            debug_info["contains_project_id"] = '"project_id"' in credentials_json
+            debug_info["contains_private_key"] = '"private_key"' in credentials_json
+        else:
+            debug_info["credentials_json_preview"] = "None"
         
         # Test JSON parsing
         if not credentials_json:
             debug_info["json_parse_success"] = False
             debug_info["json_parse_error"] = "credentials_json is None or empty"
+            debug_info["recommended_fix"] = "Set GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable with your service account JSON"
             return debug_info
             
         try:
             credentials_info = json.loads(credentials_json)
             debug_info["json_parse_success"] = True
-            debug_info["json_keys"] = list(credentials_info.keys())
-        except Exception as e:
+            debug_info["json_keys"] = list(credentials_info.keys()) if isinstance(credentials_info, dict) else "Not a dictionary"
+            
+            # Check for required fields
+            required_fields = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id"]
+            missing_fields = [field for field in required_fields if field not in credentials_info]
+            debug_info["missing_required_fields"] = missing_fields
+            debug_info["has_all_required_fields"] = len(missing_fields) == 0
+            
+        except json.JSONDecodeError as e:
             debug_info["json_parse_success"] = False
             debug_info["json_parse_error"] = str(e)
+            debug_info["recommended_fix"] = "Fix JSON formatting in GOOGLE_APPLICATION_CREDENTIALS_JSON. Common issues: escaped quotes, missing brackets, invalid characters"
+            return debug_info
+        except Exception as e:
+            debug_info["json_parse_success"] = False
+            debug_info["json_parse_error"] = f"Unexpected error: {str(e)}"
             return debug_info
         
         # Test credentials creation
         try:
             credentials = service_account.Credentials.from_service_account_info(credentials_info)
             debug_info["credentials_creation_success"] = True
+            debug_info["service_account_email"] = credentials.service_account_email
         except Exception as e:
             debug_info["credentials_creation_success"] = False
             debug_info["credentials_creation_error"] = str(e)
+            debug_info["recommended_fix"] = "Service account JSON is malformed or missing required fields"
             return debug_info
         
         # Test BigQuery client creation
         try:
             client = bigquery.Client(credentials=credentials, project=project_id)
             debug_info["client_creation_success"] = True
+            debug_info["client_project"] = client.project
             
-            # Test a simple operation
-            datasets = list(client.list_datasets(max_results=1))
-            debug_info["client_test_success"] = True
-            debug_info["datasets_count"] = len(datasets)
-            
+            # Test a simple operation with timeout
+            try:
+                datasets = list(client.list_datasets(max_results=1))
+                debug_info["client_test_success"] = True
+                debug_info["datasets_count"] = len(datasets)
+                debug_info["bigquery_access_confirmed"] = True
+                
+            except Exception as e:
+                debug_info["client_test_success"] = False
+                debug_info["client_test_error"] = str(e)
+                debug_info["recommended_fix"] = "Service account might not have BigQuery permissions. Grant 'BigQuery Data Viewer' and 'BigQuery Job User' roles."
+        
         except Exception as e:
             debug_info["client_creation_success"] = False
             debug_info["client_creation_error"] = str(e)
@@ -246,4 +284,5 @@ async def debug_credentials():
         
     except Exception as e:
         debug_info["overall_error"] = str(e)
+        debug_info["recommended_fix"] = "Unexpected error occurred during debugging"
         return debug_info

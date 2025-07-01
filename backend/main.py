@@ -25,6 +25,20 @@ async def startup_event():
         print("🗄️ Creating database tables...")
         create_tables()
         print("✅ Database tables created successfully")
+        
+        # Debug BigQuery configuration
+        print("\n🔍 Checking BigQuery Configuration...")
+        from bigquery_client import bigquery_service
+        
+        print(f"BIGQUERY_PROJECT_ID: {os.getenv('BIGQUERY_PROJECT_ID')}")
+        print(f"GOOGLE_APPLICATION_CREDENTIALS_JSON length: {len(os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON', ''))}")
+        print(f"BigQuery client initialized: {bigquery_service.client is not None}")
+        
+        if bigquery_service.client is None:
+            print("⚠️ WARNING: BigQuery client not initialized - agents will use mock data")
+        else:
+            print("✅ BigQuery client initialized successfully")
+            
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
         # Don't crash the app, but log the error
@@ -72,6 +86,44 @@ app.include_router(slack_bot_router, prefix="/api", tags=["slack-bot"])
 @app.get("/")
 async def root():
     return {"message": "AI Data Platform - Analyst Backend API"}
+
+@app.get("/debug/bigquery-status")
+async def debug_bigquery_status():
+    """Debug endpoint to check BigQuery configuration in production"""
+    try:
+        from bigquery_client import bigquery_service
+        import json
+        
+        status = {
+            "bigquery_project_id": {
+                "set": bool(os.getenv("BIGQUERY_PROJECT_ID")),
+                "value": os.getenv("BIGQUERY_PROJECT_ID") or "Not set"
+            },
+            "credentials_json": {
+                "set": bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")),
+                "length": len(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON", "")),
+                "valid_json": False,
+                "error": None
+            },
+            "bigquery_client": {
+                "initialized": bigquery_service.client is not None,
+                "using_mock_data": bigquery_service.client is None
+            }
+        }
+        
+        # Test JSON parsing
+        credentials_json = os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        if credentials_json:
+            try:
+                json.loads(credentials_json)
+                status["credentials_json"]["valid_json"] = True
+            except Exception as e:
+                status["credentials_json"]["error"] = str(e)
+        
+        return status
+        
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/health")
 async def health_check():
