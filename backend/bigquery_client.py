@@ -137,9 +137,7 @@ class BigQueryService:
                 {
                     "dataset_id": dataset.dataset_id,
                     "full_dataset_id": dataset.full_dataset_id,
-                    "created": dataset.created.isoformat() if dataset.created else None,
-                    "modified": dataset.modified.isoformat() if dataset.modified else None,
-                    "location": dataset.location
+                    "location": getattr(dataset, 'location', 'Unknown')
                 }
                 for dataset in datasets
             ]
@@ -161,11 +159,9 @@ class BigQueryService:
                 {
                     "table_id": table.table_id,
                     "full_table_id": table.full_table_id,
-                    "table_type": table.table_type,
-                    "created": table.created.isoformat() if table.created else None,
-                    "modified": table.modified.isoformat() if table.modified else None,
-                    "num_rows": table.num_rows,
-                    "size_bytes": table.num_bytes
+                    "table_type": getattr(table, 'table_type', 'TABLE'),
+                    "num_rows": getattr(table, 'num_rows', 0),
+                    "size_bytes": getattr(table, 'num_bytes', 0)
                 }
                 for table in tables
             ]
