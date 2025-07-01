@@ -108,13 +108,37 @@ async def send_message(
         # Enhance the user prompt to better trigger tool usage for data queries
         enhanced_prompt = request.message
         if any(keyword in request.message.lower() for keyword in ['trends', 'data', 'dataset', 'query', 'show', 'analyze', 'find']):
-            enhanced_prompt = f"""User query: {request.message}
+            # Create more specific prompts based on the type of request
+            if 'trends' in request.message.lower():
+                # Extract potential keywords from the message
+                keywords = []
+                for word in request.message.lower().split():
+                    if word not in ['show', 'me', 'the', 'a', 'an', 'trends', 'trend', 'data', 'from']:
+                        keywords.append(word.strip('.,!?'))
+                
+                keyword_hint = f" Try searching for keywords like: {', '.join(keywords[:3])}" if keywords else ""
+                
+                enhanced_prompt = f"""I need to analyze trends. Here's my request: "{request.message}"
 
-Please analyze this request and use your available tools to provide real data insights. If the user is asking about trends, datasets, or specific data, make sure to:
-1. Search for relevant datasets using list_available_datasets()
-2. Explore specific datasets using list_tables_in_dataset() 
-3. Execute queries using execute_bigquery() when appropriate
-4. Provide actual data-driven answers, not generic responses"""
+Please help me by:
+1. Use search_datasets_by_keyword() to find datasets related to my request{keyword_hint}
+2. Focus on finding the most relevant datasets first
+3. Provide a summary of what datasets are available that could help answer my question
+
+Start with searching for relevant datasets, then we can explore specific tables if needed."""
+            
+            elif any(word in request.message.lower() for word in ['dataset', 'datasets', 'data']):
+                enhanced_prompt = f"""User query: {request.message}
+
+Please use list_available_datasets() to show what data sources are available."""
+                
+            else:
+                enhanced_prompt = f"""User query: {request.message}
+
+Please analyze this request and use your available tools to provide real data insights. When searching for data:
+1. Start with list_available_datasets() to see what's available
+2. Use specific dataset names when exploring further
+3. Provide actual data-driven answers, not generic responses"""
         
         # Process the message with the agent
         if request.agent_mode.value == "quick":

@@ -51,11 +51,13 @@ class AIService:
 
 IMPORTANT: You have access to powerful tools for data analysis. When users ask about datasets, tables, or data queries, you MUST use the appropriate tools:
 - Use list_available_datasets() when asked about available datasets
+- Use search_datasets_by_keyword(keyword) to find datasets containing specific terms (e.g., "deposit", "user", "revenue")
 - Use list_tables_in_dataset(dataset_id) when asked about tables in a dataset
 - Use execute_bigquery(sql_query) when asked to run SQL queries
 - Use get_table_schema(table_name) when asked about table structure
 - Use preview_table_data(dataset_id, table_id) when asked to preview data
 
+For trend analysis: Start with search_datasets_by_keyword() to find relevant datasets, then explore specific ones.
 Always call the appropriate tool functions to get real data instead of giving generic responses."""
         
         if user_role == "analyst":
@@ -99,11 +101,13 @@ Example: If asked "what data do we have?", call list_available_datasets() and ex
 
 CRITICAL: You have access to powerful BigQuery tools and MUST use them to provide real, data-driven insights:
 - ALWAYS call list_available_datasets() when asked about available data
+- ALWAYS call search_datasets_by_keyword(keyword) to find datasets containing specific terms
 - ALWAYS call list_tables_in_dataset(dataset_id) to explore table structures
 - ALWAYS call execute_bigquery(sql_query) to run analytical queries
 - ALWAYS call get_table_schema(table_name) to understand data structure
 - ALWAYS call preview_table_data(dataset_id, table_id) to examine actual data
 
+For trend analysis: Start with search_datasets_by_keyword() to find relevant datasets efficiently.
 Never provide generic responses - always use tools to get real data first, then provide comprehensive analysis."""
         
         if user_role == "analyst":
@@ -161,6 +165,7 @@ Example: For "how is our business performing?", explore datasets, analyze key me
         if user.role == "analyst":
             tools.extend([
                 self.list_available_datasets,
+                self.search_datasets_by_keyword,
                 self.list_tables_in_dataset,
                 self.get_table_schema,
                 self.execute_bigquery,
@@ -173,6 +178,7 @@ Example: For "how is our business performing?", explore datasets, analyze key me
         if user.role == "general_employee":
             tools.extend([
                 self.list_available_datasets,
+                self.search_datasets_by_keyword,
                 self.simple_data_query,
                 self.get_basic_analytics
             ])
@@ -377,6 +383,52 @@ Example: For "how is our business performing?", explore datasets, analyze key me
             import traceback
             logger.error(f"🔧 Full traceback: {traceback.format_exc()}")
             return f"Error listing datasets: {str(e)}"
+    
+    def search_datasets_by_keyword(self, keyword: str) -> str:
+        """Search for datasets that contain the specified keyword in their name."""
+        logger.info(f"🔍 search_datasets_by_keyword() called with keyword: {keyword}")
+        try:
+            from bigquery_client import bigquery_service
+            logger.info("✅ bigquery_service imported successfully for search")
+            
+            datasets = bigquery_service.list_datasets()
+            logger.info(f"📊 Searching through {len(datasets)} datasets for keyword: {keyword}")
+            
+            # Filter datasets by keyword (case-insensitive)
+            keyword_lower = keyword.lower()
+            matching_datasets = []
+            for dataset in datasets:
+                dataset_name = dataset['dataset_id'].lower()
+                if keyword_lower in dataset_name:
+                    matching_datasets.append(dataset)
+            
+            logger.info(f"🎯 Found {len(matching_datasets)} datasets matching '{keyword}'")
+            
+            if not matching_datasets:
+                return f"No datasets found containing the keyword '{keyword}'. You may want to try different search terms or use list_available_datasets() to see all available datasets."
+            
+            # Format results
+            results_text = f"Found {len(matching_datasets)} datasets containing '{keyword}':\n\n"
+            for dataset in matching_datasets:
+                results_text += f"📁 {dataset['dataset_id']}\n"
+                results_text += f"   Location: {dataset.get('location', 'Unknown')}\n\n"
+            
+            # Add suggestion for next steps
+            if len(matching_datasets) == 1:
+                dataset_name = matching_datasets[0]['dataset_id']
+                results_text += f"💡 To explore this dataset further, you can use:\n"
+                results_text += f"   list_tables_in_dataset('{dataset_name}')"
+            elif len(matching_datasets) <= 5:
+                results_text += f"💡 To explore any of these datasets, use list_tables_in_dataset() with the dataset name."
+            
+            logger.info(f"✅ Successfully formatted search results (length: {len(results_text)})")
+            return results_text.strip()
+            
+        except Exception as e:
+            logger.error(f"❌ Error in search_datasets_by_keyword: {e}")
+            import traceback
+            logger.error(f"🔧 Full traceback: {traceback.format_exc()}")
+            return f"Error searching datasets by keyword '{keyword}': {str(e)}"
     
     def list_tables_in_dataset(self, dataset_id: str) -> str:
         """List all tables in a specific dataset."""
