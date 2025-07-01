@@ -394,32 +394,89 @@ Example: For "how is our business performing?", explore datasets, analyze key me
             datasets = bigquery_service.list_datasets()
             logger.info(f"📊 Searching through {len(datasets)} datasets for keyword: {keyword}")
             
-            # Filter datasets by keyword (case-insensitive)
-            keyword_lower = keyword.lower()
-            matching_datasets = []
+            # Clean the keyword
+            keyword_lower = keyword.lower().strip()
+            
+            # Try exact matches first
+            exact_matches = []
+            partial_matches = []
+            related_matches = []
+            
+            # Define related terms for common keywords
+            related_terms = {
+                'deposit': ['payment', 'transaction', 'money', 'cash', 'fund', 'balance', 'wallet', 'financial'],
+                'user': ['customer', 'player', 'account', 'profile', 'member'],
+                'revenue': ['earning', 'income', 'profit', 'financial', 'money', 'sales'],
+                'game': ['match', 'contest', 'sport', 'play', 'nba', 'nfl', 'mlb'],
+                'bet': ['wager', 'pick', 'selection', 'play', 'entry']
+            }
+            
             for dataset in datasets:
                 dataset_name = dataset['dataset_id'].lower()
+                
+                # Exact keyword match
                 if keyword_lower in dataset_name:
-                    matching_datasets.append(dataset)
+                    exact_matches.append(dataset)
+                # Partial word matches (any word in keyword appears in dataset name)
+                elif any(word in dataset_name for word in keyword_lower.split()):
+                    partial_matches.append(dataset)
+                # Related terms matches
+                elif keyword_lower in related_terms:
+                    for related_term in related_terms[keyword_lower]:
+                        if related_term in dataset_name:
+                            related_matches.append(dataset)
+                            break
             
-            logger.info(f"🎯 Found {len(matching_datasets)} datasets matching '{keyword}'")
+            # Determine best matches to show
+            all_matches = exact_matches + partial_matches + related_matches
             
-            if not matching_datasets:
-                return f"No datasets found containing the keyword '{keyword}'. You may want to try different search terms or use list_available_datasets() to see all available datasets."
+            logger.info(f"🎯 Found {len(exact_matches)} exact, {len(partial_matches)} partial, {len(related_matches)} related matches for '{keyword}'")
+            
+            if not all_matches:
+                # If no matches found, provide helpful suggestions
+                sample_datasets = datasets[:10] if len(datasets) > 10 else datasets
+                sample_names = [d['dataset_id'] for d in sample_datasets]
+                
+                return f"""No datasets found containing '{keyword}' or related terms.
+
+Here are some available datasets you might be interested in:
+{chr(10).join([f"📁 {name}" for name in sample_names])}
+
+💡 **Suggestions:**
+- Try broader terms like 'financial', 'user', 'game', or 'analytics'
+- Use list_available_datasets() to see all {len(datasets)} available datasets
+- Look for datasets with names that might contain your data indirectly"""
+            
+            # Show top matches (max 8 to prevent long responses)
+            top_matches = all_matches[:8]
             
             # Format results
-            results_text = f"Found {len(matching_datasets)} datasets containing '{keyword}':\n\n"
-            for dataset in matching_datasets:
-                results_text += f"📁 {dataset['dataset_id']}\n"
+            results_text = f"Found {len(all_matches)} datasets related to '{keyword}'"
+            if len(all_matches) > 8:
+                results_text += f" (showing top 8):\n\n"
+            else:
+                results_text += ":\n\n"
+                
+            for i, dataset in enumerate(top_matches):
+                match_type = ""
+                if dataset in exact_matches:
+                    match_type = " ⭐ (exact match)"
+                elif dataset in partial_matches:
+                    match_type = " 📍 (partial match)"
+                else:
+                    match_type = " 🔗 (related)"
+                    
+                results_text += f"📁 {dataset['dataset_id']}{match_type}\n"
                 results_text += f"   Location: {dataset.get('location', 'Unknown')}\n\n"
             
-            # Add suggestion for next steps
-            if len(matching_datasets) == 1:
-                dataset_name = matching_datasets[0]['dataset_id']
-                results_text += f"💡 To explore this dataset further, you can use:\n"
-                results_text += f"   list_tables_in_dataset('{dataset_name}')"
-            elif len(matching_datasets) <= 5:
-                results_text += f"💡 To explore any of these datasets, use list_tables_in_dataset() with the dataset name."
+            # Add next steps suggestion
+            if len(top_matches) == 1:
+                dataset_name = top_matches[0]['dataset_id']
+                results_text += f"💡 To explore this dataset: list_tables_in_dataset('{dataset_name}')"
+            elif len(top_matches) <= 3:
+                results_text += f"💡 To explore any dataset: list_tables_in_dataset('dataset_name')"
+            else:
+                results_text += f"💡 Focus on the exact matches (⭐) first, then explore others as needed."
             
             logger.info(f"✅ Successfully formatted search results (length: {len(results_text)})")
             return results_text.strip()

@@ -3,6 +3,8 @@ from typing import List
 from datetime import datetime
 import uuid
 import logging
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from models import ChatRequest, ChatResponse, ChatMessage, User, MessageSender, AgentMode
 from routers.auth import get_current_user
@@ -110,22 +112,31 @@ async def send_message(
         if any(keyword in request.message.lower() for keyword in ['trends', 'data', 'dataset', 'query', 'show', 'analyze', 'find']):
             # Create more specific prompts based on the type of request
             if 'trends' in request.message.lower():
-                # Extract potential keywords from the message
-                keywords = []
+                # Extract the main keyword from the message
+                main_keyword = None
                 for word in request.message.lower().split():
-                    if word not in ['show', 'me', 'the', 'a', 'an', 'trends', 'trend', 'data', 'from']:
-                        keywords.append(word.strip('.,!?'))
+                    if word not in ['show', 'me', 'the', 'a', 'an', 'trends', 'trend', 'data', 'from', 'recent', 'key']:
+                        main_keyword = word.strip('.,!?')
+                        break
                 
-                keyword_hint = f" Try searching for keywords like: {', '.join(keywords[:3])}" if keywords else ""
-                
-                enhanced_prompt = f"""I need to analyze trends. Here's my request: "{request.message}"
+                if main_keyword:
+                    enhanced_prompt = f"""I need to analyze {main_keyword} trends. Here's my request: "{request.message}"
 
 Please help me by:
-1. Use search_datasets_by_keyword() to find datasets related to my request{keyword_hint}
-2. Focus on finding the most relevant datasets first
-3. Provide a summary of what datasets are available that could help answer my question
+1. Use search_datasets_by_keyword('{main_keyword}') to find relevant datasets
+2. Based on the search results, provide insights about what data is available
+3. If you find relevant datasets, suggest specific next steps
 
-Start with searching for relevant datasets, then we can explore specific tables if needed."""
+**Important**: Start with just ONE search for '{main_keyword}' - don't try multiple searches at once."""
+                else:
+                    enhanced_prompt = f"""I need to analyze trends. Here's my request: "{request.message}"
+
+Please help me by:
+1. Use list_available_datasets() to see what data sources are available
+2. Provide insights about what datasets might contain trend data
+3. Suggest specific datasets to explore further
+
+Focus on providing helpful guidance based on available datasets."""
             
             elif any(word in request.message.lower() for word in ['dataset', 'datasets', 'data']):
                 enhanced_prompt = f"""User query: {request.message}
@@ -141,12 +152,40 @@ Please analyze this request and use your available tools to provide real data in
 3. Provide actual data-driven answers, not generic responses"""
         
         # Process the message with the agent
-        if request.agent_mode.value == "quick":
-            # Quick mode: Return immediate response
-            response_text = agent.tool_call(enhanced_prompt)
-        else:
-            # Deep mode: Also use tool_call for comprehensive research
-            response_text = agent.tool_call(enhanced_prompt)
+        try:
+            logger.info(f"Processing message with {'Deep' if request.agent_mode.value == 'deep' else 'Quick'} agent for user {current_user.email}")
+            
+            # Add timeout protection for agent calls
+            def call_agent():
+                return ai_service.create_chat_agent(user=current_user, agent_mode=request.agent_mode).tool_call(enhanced_prompt)
+            
+            # Run with timeout (30 seconds)
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as executor:
+                try:
+                    future = loop.run_in_executor(executor, call_agent)
+                    response_text = await asyncio.wait_for(future, timeout=30.0)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Agent call timed out for user {current_user.email}")
+                    response_text = f"""⏰ **Analysis Timeout**
+
+Your query "{request.message}" is being processed, but it's taking longer than expected. This usually happens when searching through large datasets.
+
+**Quick suggestions for '{request.message.lower()}':**
+• Try using more specific keywords (e.g., 'financial' instead of 'deposit trends')
+• Break down complex requests into smaller parts
+• Ask about specific datasets first: "What datasets are available?"
+
+The system is working - just need to be more specific with data requests."""
+                
+        except Exception as e:
+            logger.error(f"Error processing chat message: {e}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error processing your message: {str(e)}"
+            )
         
         # Save the agent's response to maintain history
         db = next(get_db())
